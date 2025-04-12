@@ -52,38 +52,11 @@ export type TTime = string;
 export type TTimestamp = string;
 export type TPostcode = string;
 
-export type TRole = string;
-export type TUser = string;
-
-
-export enum EDatumType {
-
+export type KeyValue = {
+    key: string,
+    value: string,
 }
 
-export type TDatumSpec = {
-    datumType: EDatumType,
-    defValue?: string,
-}
-export type TDataSpec = {
-    [name: string]: TDatumSpec | TDataSpec
-}
-
-export type TDatumInstance = {
-    type: EDatumType,
-    value: string | number,
-}
-export type TDataInstance = {
-    [name: string]: TDatumInstance | TDataInstance
-}
-
-export type TValidationSpec = {
-    required: boolean,
-    pattern?: string,
-    valRange?: { min?: number, max?: number },
-    lenRange?: { min?: number, max?: number },
-    relDateRange?: { min?: number, max?: number },
-    timeRange?: { min?: number, max?: number }, // in minutes
-}
 
 export type THtmlControlSpec = {
     name: string,
@@ -117,52 +90,3 @@ export type TWorkUnitSpec = {
     }[]
 }
 
-export type TTaskSpec = {
-    name: string,
-    role: TRole,
-
-}
-
-export enum EFlowStatus {
-    OPEN,
-    CLOSED
-}
-export enum EUserTaskStatus {
-    WAITING,
-    OPEN,
-    CLOSED
-}
-
-export type TFlowSpec = {
-    name: string,
-    role: TRole,
-    data: TDataSpec
-}
-
-export type TFlowInstance = {
-    nameId: string,
-    instanceId: string,
-    created: {
-        role: TRole,
-        user: TUser,
-        timestamp: TTimestamp,
-    },
-    iterations: {
-        role: TRole,
-        user: TUser,
-        timestamp: TTimestamp,
-        taskName: string,
-        taskInstance: string,
-        data: TDataInstance,
-    },
-    status: EFlowStatus,
-    closed: TTimestamp,
-}
-
-export type TSimpleFlow = {
-    datafields: TDatumSpec[],
-    validations: TValidationSpec[],
-    htmlcontrols: THtmlControlSpec[],
-    htmlforms: TUserInputSpec[],
-    workunits: TWorkUnitSpec[],
-}
