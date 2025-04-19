@@ -1,46 +1,56 @@
-import { TEmail, TFlowSpec } from "./types";
-import { TUser } from "./access";
+
+import { TUser, TEmail, TRole, TRoleName, TCredential, TName, TInstanceId, TFlowSpec } from "./types";
+import { TFlowInstance } from "./flows";
+import { TTaskInstance } from "./tasks";
 
 const { FSDB } = require("file-system-db");
 
-const dbFlowSpec = new FSDB("./dbFlowSpec.json", false);
-
-export function loadFlowSpec(flowName: string): TFlowSpec {
-    return dbFlowSpec.get(flowName);
+const dbFlowSpecs = new FSDB("./db/FlowSpecs.json", false);
+export function dbSaveFlowSpec(flowSpec: TFlowSpec): void {
+    dbFlowSpecs.set(flowSpec.flowSpecName, flowSpec);
+}
+export function dbLoadFlowSpec(flowName: TName): TFlowSpec {
+    return dbFlowSpecs.get(flowName);
 }
 
-const dbCredentials = new FSDB("./dbCredentials.json", false);
-const REPOS = [ "users", "roles", "userroles", "roleusers" ];
-REPOS.filter(key => !dbCredentials.has(key)).forEach(key => dbCredentials.set(key, {}));
-
-export function dbAddUser(user: TUser): TUser {
-    const key = `${REPOS[0]}.${user.useremail}`;
-    if (dbCredentials.has(key)) {
-        throw "err";
-    }
-    dbCredentials.set(key, user);
-    return user;
+const dbFlowInstances = new FSDB("./db/FlowInstances.json", false);
+export function dbSaveFlowInstance(flowInstance: TFlowInstance): void {
+    dbFlowInstances.set(flowInstance.flowInstanceId, flowInstance);
+}
+export function dbLoadInstance(flowInstanceId: TInstanceId): TFlowInstance | undefined {
+    return dbFlowInstances.get(flowInstanceId);
 }
 
-export function dbDisableUser(user: TUser): TUser {
-    const key = `${REPOS[0]}.${user.useremail}`;
-    if (!dbCredentials.has(key)) {
-        throw "err";
-    }
-    dbCredentials.set(`${key}.active`, false);
-    return user;
+const dbTaskInstances = new FSDB("./db/TaskInstances.json", false);
+export function dbSaveTaskInstance(taskInstance: TTaskInstance): void {
+    dbTaskInstances.set(taskInstance.taskInstanceId, taskInstance);
+}
+export function dbLoadTaskInstance(taskInstanceId: TInstanceId): TTaskInstance | undefined {
+    return dbTaskInstances.get(taskInstanceId);
 }
 
-export function existsUser(userEmail: TEmail): boolean {
-    const key = `${REPOS[0]}.${userEmail}`;
-    return (dbCredentials.has(key));
+
+const dbUsers = new FSDB("./db/Users.json", false);
+export function dbSaveUser(user: TUser): void {
+    dbUsers.set(user.emailId, user);
+}
+export function dbLoadUser(emailId: TEmail): TUser | undefined {
+    return dbUsers.get(emailId);
 }
 
-export function hasUserRole(userEmail: TEmail, roleName: string): boolean {
-    if (existsUser(userEmail)) {
-        const key = `${REPOS[2]}.${userEmail}`;
-        return (dbCredentials.get(key).includes(roleName));
-    }
-    return false;
+const dbRoles = new FSDB("./db/Roles.json", false);
+export function dbSaveRole(role: TRole): void {
+    dbUsers.set(role.name, role);
+}
+export function dbLoadRole(roleName: TRoleName): TRole | undefined {
+    return dbRoles.get(roleName);
+}
+
+const dbCredentials = new FSDB("./db/Credentials.json", false);
+export function dbSaveCredential(credential: TCredential): void {
+    dbCredentials.set(credential.emailId, dbCredentials);
+}
+export function dbLoadCredential(emailId: TEmail): TCredential | undefined {
+    return dbCredentials.get(emailId);
 }
 
