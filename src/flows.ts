@@ -1,172 +1,239 @@
-import { dbLoadFlowSpec } from "./store";
-import { TTaskInstance, TTaskSpecName } from "./tasks";
-import { DatumName, EDatumType, EWidgetAccess, TCredential, TDataSpec, TDatumSpec, TEmail, TFlowSpec, TInstanceId, TLabel, TRoleName, TTimestamp, TValidationSpec } from "./types";
-import * as util from "./utils";
+import * as t from "./types";
+import * as u from "./utils";
+import { TCredential } from "./access";
+import { OBaseInstance, TResponse } from "./base";
+import { DataConfigs, TDataConfig } from "./data";
+import { ViewConfigs, TViewConfig } from "./view";
+import { TTaskConfig, TTaskInstance } from "./task";
+import { dbLoadFlowInstance, dbSaveFlowInstance, dbSaveFlowSpecification } from "./store";
+import { MissingFlow, MissingRole, OAuditReport } from "./audit";
 
 
 
-
-export type TDatumInstance = {
-    type: EDatumType,
-    datumValue: string | number,
-}
-export type TDataInstance = {
-    [datumName: DatumName]: TDatumInstance | TDataInstance
+export enum EDataType {
+    INTEGER,
+    DECIMAL,
+    DATE,
+    TIME,
+    TIMESTAMP,
+    EMAIL,
+    MALDIVIAN_PHONE,
+    MALDIVIAN_ID,
+    NUMERIC,
+    ALPHABETIC,
+    ALPHANUMERIC,
+    PASSWORD,
 }
 
 export enum EFlowStatus {
     OPEN,
-    CLOSED
+    CLOSED,
+    ABORTED,
+}
+
+
+export type TFlowConfig = {
+    name: t.TName,
+    roles: t.TName[],
+    formName: t.TName,                  // kick start data input as contained in form
+    dataConfigs: TDataConfig[],         // every data item has its own config
+    viewConfigs: TViewConfig[],         // every data item has its won view/rendering
+    taskConfigs: TTaskConfig[],         // user input tasks 
+}
+
+export type TDataInstance = {
+    name: t.TName,
+    value: string | number | boolean,
+}
+
+export type TLogItem = {
+    timestamp: t.TTimestamp,
+    description: t.TDescription,
+    credential: TCredential,
+    taskInstanceId?: t.TInstanceId,
+    taskData?: TDataInstance[],
 }
 
 export type TFlowInstance = {
-    flowSpecName: TLabel,
-    flowInstanceId: TInstanceId,
-    flowCreated: {
-        roleNames: TRoleName[],
-        emailId: TEmail,
-        timestamp: TTimestamp,
-    },
-    flowIterations: {
-        roleNames: TRoleName[],
-        emailId: TEmail,
-        timestamp: TTimestamp,
-        taskSpecName: TTaskSpecName,
-        taskInstanceId: TInstanceId,
-        data: TDataInstance,
-    }[],
-    flowData: TDataInstance,
-    flowLog: {
-        timestamp: TTimestamp,
-        activity: string,
-    }[],
-    flowStatus: EFlowStatus,
-    flowClosed: TTimestamp,
-}
-
-
-
-function findTaskSpec(flowSpec: TFlowSpec, taskSpecName: TTaskSpecName): TTaskSpecName | undefined {
-    const taskSpec = flowSpec.flowTasks.find(ts => ts.taskSpecName == taskSpecName);
-    if (taskSpec) return taskSpec.taskNext[0].taskName;
-    return undefined;
-}
-
-// will only be called by a user
-export function flowPeek(flowSpecName: TLabel, credential: TCredential): Record<string, any> {
-    const flowSpec: TFlowSpec = dbLoadFlowSpec(flowSpecName);
-    const roles: TRoleName[] = util.ArrayIntersection(flowSpec.flowInitRoles, credential.activeRoleNames);
-    if (!roles.length) {
-        return createError(flowSpec, credential, "flowPeek", `security violation - cannot peek into this workflow`);
+    name: t.TName,
+    instanceId: t.TInstanceId,
+    timestamps: {
+        created: t.TTimestamp,
+        closed?: t.TTimestamp,
+        aborted?: t.TTimestamp,
     }
-    const initFrm: TLabel = flowSpec.flowInitForm;
-    const form = flowSpec.flowRendering.filter(fld => fld.forms.find(frm => frm.formName == initFrm)?.renderLevel != EWidgetAccess.HIDDEN);
-    return form;
+    logItems: TLogItem[],
+    dataInstances: TDataInstance[],
+    status: EFlowStatus,
 }
 
-export function flowStart(flowSpecName: TLabel, credential: TCredential, data: TDataInstance): Record<string, any> {
-    const flowSpec: TFlowSpec = dbLoadFlowSpec(flowSpecName);
-    const roles: TRoleName[] = util.ArrayIntersection(flowSpec.flowInitRoles, credential.activeRoleNames);
-    if (!roles.length) {
-        return createError(flowSpec, credential, "flowStart", `security violation - cannot create this workflow`);
+
+
+/**
+ * Singleton class that stores all the flow configs.
+ */
+export class FlowConfigs {
+
+    private static configs: FlowConfigs = new FlowConfigs();
+
+    private flowConfigs: Map<t.TName, TFlowConfig> = new Map();
+
+    private viewConfigs: ViewConfigs = ViewConfigs.getInstance();
+    private dataConfigs: DataConfigs = DataConfigs.getInstance();
+
+    private constructor() {
+        // empty private constructor - this is a singleton class
     }
-    const validationErrors = validateData(flowSpec.flowDataSpec, data);
-    if (validationErrors.keys().length > 0) {
 
+    static getInstance(): FlowConfigs {
+        return FlowConfigs.configs;
     }
-    // start workflow
-    const flowInstance: TFlowInstance = {
-        flowSpecName: flowSpec.flowSpecName,
-        flowInstanceId: util.RandomStr(),
-        flowCreated: {
-            roleNames: credential.activeRoleNames,
-            emailId: credential.emailId,
-            timestamp: util.TimestampStr(),
-        },
-        flowIterations: [],
-        flowData: data,
-        flowLog: [],
-        flowStatus: EFlowStatus.OPEN,
-        flowClosed: util.TimestampStr(),
-    };
-    const taskInstance: TTaskInstance = taskCreate(credential, flowSpec.flowInitTask, flowInstance.flowInstanceId);
 
-}
-
-export function flowNext() {
-
-}
-
-function createError(flowSpec: TFlowSpec, credential: TCredential, method: string, msg: string): Record<string, any> {
-    return {
-        error: msg,
-        method: method,
-        flowName: flowSpec.flowSpecName,
-        flowDescription: flowSpec.flowSpecName,
-        flowRoles: flowSpec.flowInitRoles,
-        userCredential: credential
+    clearCache(): void {
+        this.flowConfigs.clear();
     }
-}
 
-// export type TValidationSpec = {
-//     dateRange?: { min?: TInteger, max?: TInteger },     // days relative to TODAY()
-//     timeRange?: { min?: TInteger, max?: TInteger },     // in minutes
-// }
+    parse(flowConfig: TFlowConfig): void {
+        this.viewConfigs.parse(flowConfig);
+    }
 
-function validateData(dataSpec: TDataSpec, data: TDataInstance): Record<string, any> {
-    const violations = {};
-    for (const datumName in dataSpec) {
-        const genericValue = dataSpec[datumName];
-        if (typeof genericValue === 'object') {
-            const dataValue = genericValue as TDataSpec
-            violations[datumName] = validateData(dataValue, data[datumName] as TDataInstance);
-        } else {
-            const datumValue = genericValue as TDatumSpec;
-            if (!datumValue.validations) continue;
-            const validations: TValidationSpec = datumValue.validations;
-            const dataValue = data[datumName];
-            //     required?: boolean,
-            const required = validations.required ?? false;
-            if (required) {
-                if (!dataValue) {
-                    violations[datumName] = `required field`;
-                    continue;
-                }
-            }
-            //     pattern?: string,
-            const pattern = validations.pattern;
-            if (pattern) {
-                if (!dataValue.toString().match(pattern)) {
-                    violations[datumName] = `pattern [${pattern}] match failed`;
-                }
-            }
-            //     valRange?: { min?: TDecimal, max?: TDecimal },
-            const valRange = validations.valRange;
-            if (valRange) {
-                const min = Number(valRange.min);
-                if (!isNaN(min) && min > Number(dataValue)) {
-                    violations[datumName] = `min value [${min}] > actual [${dataValue}]`;
-                }
-                const max = Number(valRange.max);
-                if (!isNaN(max) && max <= Number(dataValue)) {
-                    violations[datumName] = `max value [${max}] <= actual [${dataValue}]`;
-                }
-            }
-            //     lenRange?: { min?: TInteger, max?: TInteger },
-            const lenRange = validations.lenRange;
-            if (lenRange) {
-                const len = dataValue?.toString().length ?? 0;
-                const min = Number(lenRange.min);
-                if (!isNaN(min) && min > len) {
-                    violations[datumName] = `min length [${min}] > actual [${len}]`;
-                }
-                const max = Number(lenRange.max);
-                if (!isNaN(max) && max <= len) {
-                    violations[datumName] = `max length [${max}] <= actual [${len}]`;
-                }
-            }
-            // TODO
+
+    fetchFlow(credential: TCredential, flowName: t.TName): TResponse {
+        const flowConfig = this.flowConfigs.get(flowName);
+        const response: TResponse = {};
+        // check for valid flow
+        if (!flowConfig) {
+            const payload: t.JSONObject = {
+                flowName: flowName,
+            };
+            response.error = MissingFlow(credential, payload);
+            return response;
+        };
+        // check for valid role
+        if (u.ArrayIntersection(flowConfig.roles, credential.roleNames).length == 0) {
+            const payload: t.JSONObject = {
+                flowName: flowName,
+                userName: credential.userName,
+                haveRoles: credential.roleNames,
+                needRoles: flowConfig.roles,
+            };
+            response.error = MissingRole(credential, payload);
+            return response;
+        };
+        // prepare response
+        const viewConfigs = ViewConfigs.getInstance().allConfigs(flowName, flowConfig.formName);
+        const dataConfigs = DataConfigs.getInstance().allConfigs(flowName, flowConfig.formName);
+        response.data = {
+            viewConfigs: viewConfigs,
+            dataConfigs: dataConfigs,
+            dataInstances: []
+        };
+        return response;
+    }
+
+    startFlow(credential: TCredential, flowName: t.TName, dataInstances: TDataInstance[]): TResponse {
+        const flowConfig = this.flowConfigs.get(flowName);
+        const response: TResponse = {};
+        // check for valid flow
+        if (!flowConfig) {
+            const payload: t.JSONObject = {
+                flowName: flowName,
+            };
+            response.error = MissingFlow(credential, payload);
+            return response;
+        };
+        // check for valid role
+        if (u.ArrayIntersection(flowConfig.roles, credential.roleNames).length == 0) {
+            const payload: t.JSONObject = {
+                flowName: flowName,
+                userName: credential.userName,
+                haveRoles: credential.roleNames,
+                needRoles: flowConfig.roles,
+            };
+            response.error = MissingRole(credential, payload);
+            throw response;
+        };
+        // reduce the supplied data to editable fields only
+        const editableFieldNames = ViewConfigs.getInstance().editableFieldNames(flowName, flowConfig.name);
+        dataInstances = dataInstances.filter(dataInstance => editableFieldNames.includes(dataInstance.name));
+        // validate relevant data and throw if validation errors
+        const causes = DataConfigs.getInstance().validateForm(flowName, flowConfig.name, dataInstances);
+        if (!causes.length) {
+            const auditReport: OAuditReport = new OAuditReport({ "credential": credential });
+            causes.forEach(cause => auditReport.addCause(cause));
+            // auditReport.save();
+            response.error = causes;
+            return response;
         }
+        // submission is valid
+        const flowInstance: OFlowInstance = new OFlowInstance({ "name": flowName });
+        flowInstance.log(credential, "flow created");
+        flowInstance.update(dataInstances);
+        flowInstance.save();
+        return response;
     }
-    return violations;
+
 }
+
+
+export class OFlowInstance extends OBaseInstance<t.TInstanceId, TFlowInstance> {
+
+
+    constructor(flowInstance: t.AtLeast<TFlowInstance, "name">) {
+        const data: TFlowInstance = {
+            name: flowInstance.name,
+            instanceId: flowInstance.instanceId ?? u.RandomStr(),
+            logItems: flowInstance.logItems ?? [],
+            dataInstances: flowInstance.dataInstances ?? [],
+            status: flowInstance.status ?? EFlowStatus.OPEN,
+            timestamps: {
+                created: u.TimestampStr(),
+            },
+        };
+        super("instanceId", dbSaveFlowInstance, data);
+        this.freeze(this.isClosed());
+    }
+
+    public static getInstance(flowInstanceId: t.TInstanceId): OFlowInstance | undefined {
+        return OBaseInstance.loadInstance(flowInstanceId, dbLoadFlowInstance, OFlowInstance);
+    }
+
+    isClosed(): boolean {
+        return this.data.status != EFlowStatus.OPEN;
+    }
+
+    close(credential: TCredential): OFlowInstance {
+        this.data.status = EFlowStatus.CLOSED;
+        this.data.timestamps.closed = u.TimestampStr();
+        this.freeze(this.isClosed());
+        // TODO
+        return this;
+    }
+
+    log(credential: TCredential, description: t.TDescription): TLogItem {
+        const logItem: TLogItem = {
+            timestamp: u.TimestampStr(),
+            credential: credential,
+            description: description,
+        };
+        this.data.logItems.push(logItem);
+        return logItem;
+    }
+
+    update(dataInstances: TDataInstance[]): OFlowInstance {
+        // iterate flowForm data fields and update from taskData
+        for (const dataInstance of dataInstances) {
+            const foundInstance = this.data.dataInstances.find(dI => dI.name == dataInstance.name);
+            if (!foundInstance) {
+                this.data.dataInstances.push(dataInstance);
+            };
+        };
+        return this;
+    }
+
+
+}
+
+
+
+
