@@ -1,239 +1,219 @@
-import * as t from "./types";
-import * as u from "./utils";
-import { TCredential } from "./access";
-import { OBaseInstance, TResponse } from "./base";
-import { DataConfigs, TDataConfig } from "./data";
-import { ViewConfigs, TViewConfig } from "./view";
-import { TTaskConfig, TTaskInstance } from "./task";
-import { dbLoadFlowInstance, dbSaveFlowInstance, dbSaveFlowSpecification } from "./store";
-import { MissingFlow, MissingRole, OAuditReport } from "./audit";
+import { OceanFlow as t } from "./types";
+import { OceanFlow as u } from "./utils";
+import { OceanFlow as c } from "./core";
+import { OceanFlow as d } from "./data";
+import { OceanFlow as a } from "./audit";
+import { validateData } from "./data";
+import { dbLoadFlowInstance, dbSaveFlowInstance } from "./store";
 
 
 
-export enum EDataType {
-    INTEGER,
-    DECIMAL,
-    DATE,
-    TIME,
-    TIMESTAMP,
-    EMAIL,
-    MALDIVIAN_PHONE,
-    MALDIVIAN_ID,
-    NUMERIC,
-    ALPHABETIC,
-    ALPHANUMERIC,
-    PASSWORD,
-}
-
-export enum EFlowStatus {
-    OPEN,
-    CLOSED,
-    ABORTED,
-}
+export namespace OceanFlow {
 
 
-export type TFlowConfig = {
-    name: t.TName,
-    roles: t.TName[],
-    formName: t.TName,                  // kick start data input as contained in form
-    dataConfigs: TDataConfig[],         // every data item has its own config
-    viewConfigs: TViewConfig[],         // every data item has its won view/rendering
-    taskConfigs: TTaskConfig[],         // user input tasks 
-}
+    export const FlowConfigs = new c.Configs<t.NameT, t.FlowConfigT, FlowConfig>();
 
-export type TDataInstance = {
-    name: t.TName,
-    value: string | number | boolean,
-}
+    export class FlowConfig extends c.Base<t.NameT, t.FlowConfigT> {
 
-export type TLogItem = {
-    timestamp: t.TTimestamp,
-    description: t.TDescription,
-    credential: TCredential,
-    taskInstanceId?: t.TInstanceId,
-    taskData?: TDataInstance[],
-}
+        private dataConfigs = new c.Configs<t.NameT, t.DataConfigT, d.DataConfig>();
+        // viewConfigs, fieldNames, dataConfigs for each form 
+        private formViewConfigs: Map<t.NameT, t.ViewConfigT[]> = new Map();
+        // private formValueNames: Map<t.TName, t.TName[]> = new Map();
+        private formDataConfigs: Map<t.NameT, t.DataConfigT[]> = new Map();
+        // only some data-configs may require be updated flow-data
+        private formSaveDataConfigs: Map<t.NameT, t.DataConfigT[]> = new Map();
 
-export type TFlowInstance = {
-    name: t.TName,
-    instanceId: t.TInstanceId,
-    timestamps: {
-        created: t.TTimestamp,
-        closed?: t.TTimestamp,
-        aborted?: t.TTimestamp,
-    }
-    logItems: TLogItem[],
-    dataInstances: TDataInstance[],
-    status: EFlowStatus,
-}
-
-
-
-/**
- * Singleton class that stores all the flow configs.
- */
-export class FlowConfigs {
-
-    private static configs: FlowConfigs = new FlowConfigs();
-
-    private flowConfigs: Map<t.TName, TFlowConfig> = new Map();
-
-    private viewConfigs: ViewConfigs = ViewConfigs.getInstance();
-    private dataConfigs: DataConfigs = DataConfigs.getInstance();
-
-    private constructor() {
-        // empty private constructor - this is a singleton class
-    }
-
-    static getInstance(): FlowConfigs {
-        return FlowConfigs.configs;
-    }
-
-    clearCache(): void {
-        this.flowConfigs.clear();
-    }
-
-    parse(flowConfig: TFlowConfig): void {
-        this.viewConfigs.parse(flowConfig);
-    }
-
-
-    fetchFlow(credential: TCredential, flowName: t.TName): TResponse {
-        const flowConfig = this.flowConfigs.get(flowName);
-        const response: TResponse = {};
-        // check for valid flow
-        if (!flowConfig) {
-            const payload: t.JSONObject = {
-                flowName: flowName,
+        constructor(flowConfigT: t.FlowConfigT) {
+            super("instanceId", flowConfigT);
+            const dataConfigs = flowConfigT.dataConfigsT.map(dataConfig => new d.DataConfig(dataConfig));
+            this.dataConfigs.add(dataConfigs);
+            for (const viewConfigT of flowConfigT.viewConfigsT) {
+                for (const form of viewConfigT.forms) {
+                    const formNameT = form.nameT;
+                    if (!this.formViewConfigs.has(formNameT)) {
+                        this.formViewConfigs.set(formNameT, []);
+                    }
+                    this.formViewConfigs.get(formNameT)!.push(viewConfigT);
+                    // get value names
+                    const dataNames: t.NameT[] = [];
+                    if (viewConfigT.component) {
+                        dataNames.push(...viewConfigT.component.dataNames);
+                    };
+                    if (viewConfigT.custom) {
+                        dataNames.push(viewConfigT.custom.dataName);
+                    };
+                    // all dataconfigs
+                    const dataConfigs: t.DataConfigT[] = [];
+                    dataNames.forEach(dataName => {
+                        const dataConfig = flowConfigT.dataConfigsT.find(dataConfig => dataConfig.name == dataName)!;
+                        dataConfigs.push(dataConfig);
+                    });
+                    if (!this.formDataConfigs.has(formNameT)) {
+                        this.formDataConfigs.set(formNameT, []);
+                    };
+                    this.formDataConfigs.get(formNameT)!.push(...dataConfigs);
+                    // data-configs that upload data to flow can be less than all data-configs
+                    if (form.isFlowData) {
+                        if (!this.formSaveDataConfigs.has(formNameT)) {
+                            this.formSaveDataConfigs.set(formNameT, []);
+                        };
+                        this.formDataConfigs.get(formNameT)!.push(...dataConfigs);
+                    };
+                };
             };
-            response.error = MissingFlow(credential, payload);
-            return response;
-        };
-        // check for valid role
-        if (u.ArrayIntersection(flowConfig.roles, credential.roleNames).length == 0) {
-            const payload: t.JSONObject = {
-                flowName: flowName,
-                userName: credential.userName,
-                haveRoles: credential.roleNames,
-                needRoles: flowConfig.roles,
-            };
-            response.error = MissingRole(credential, payload);
-            return response;
-        };
-        // prepare response
-        const viewConfigs = ViewConfigs.getInstance().allConfigs(flowName, flowConfig.formName);
-        const dataConfigs = DataConfigs.getInstance().allConfigs(flowName, flowConfig.formName);
-        response.data = {
-            viewConfigs: viewConfigs,
-            dataConfigs: dataConfigs,
-            dataInstances: []
-        };
-        return response;
-    }
-
-    startFlow(credential: TCredential, flowName: t.TName, dataInstances: TDataInstance[]): TResponse {
-        const flowConfig = this.flowConfigs.get(flowName);
-        const response: TResponse = {};
-        // check for valid flow
-        if (!flowConfig) {
-            const payload: t.JSONObject = {
-                flowName: flowName,
-            };
-            response.error = MissingFlow(credential, payload);
-            return response;
-        };
-        // check for valid role
-        if (u.ArrayIntersection(flowConfig.roles, credential.roleNames).length == 0) {
-            const payload: t.JSONObject = {
-                flowName: flowName,
-                userName: credential.userName,
-                haveRoles: credential.roleNames,
-                needRoles: flowConfig.roles,
-            };
-            response.error = MissingRole(credential, payload);
-            throw response;
-        };
-        // reduce the supplied data to editable fields only
-        const editableFieldNames = ViewConfigs.getInstance().editableFieldNames(flowName, flowConfig.name);
-        dataInstances = dataInstances.filter(dataInstance => editableFieldNames.includes(dataInstance.name));
-        // validate relevant data and throw if validation errors
-        const causes = DataConfigs.getInstance().validateForm(flowName, flowConfig.name, dataInstances);
-        if (!causes.length) {
-            const auditReport: OAuditReport = new OAuditReport({ "credential": credential });
-            causes.forEach(cause => auditReport.addCause(cause));
-            // auditReport.save();
-            response.error = causes;
-            return response;
         }
-        // submission is valid
-        const flowInstance: OFlowInstance = new OFlowInstance({ "name": flowName });
-        flowInstance.log(credential, "flow created");
-        flowInstance.update(dataInstances);
-        flowInstance.save();
-        return response;
-    }
 
-}
-
-
-export class OFlowInstance extends OBaseInstance<t.TInstanceId, TFlowInstance> {
-
-
-    constructor(flowInstance: t.AtLeast<TFlowInstance, "name">) {
-        const data: TFlowInstance = {
-            name: flowInstance.name,
-            instanceId: flowInstance.instanceId ?? u.RandomStr(),
-            logItems: flowInstance.logItems ?? [],
-            dataInstances: flowInstance.dataInstances ?? [],
-            status: flowInstance.status ?? EFlowStatus.OPEN,
-            timestamps: {
-                created: u.TimestampStr(),
-            },
-        };
-        super("instanceId", dbSaveFlowInstance, data);
-        this.freeze(this.isClosed());
-    }
-
-    public static getInstance(flowInstanceId: t.TInstanceId): OFlowInstance | undefined {
-        return OBaseInstance.loadInstance(flowInstanceId, dbLoadFlowInstance, OFlowInstance);
-    }
-
-    isClosed(): boolean {
-        return this.data.status != EFlowStatus.OPEN;
-    }
-
-    close(credential: TCredential): OFlowInstance {
-        this.data.status = EFlowStatus.CLOSED;
-        this.data.timestamps.closed = u.TimestampStr();
-        this.freeze(this.isClosed());
-        // TODO
-        return this;
-    }
-
-    log(credential: TCredential, description: t.TDescription): TLogItem {
-        const logItem: TLogItem = {
-            timestamp: u.TimestampStr(),
-            credential: credential,
-            description: description,
-        };
-        this.data.logItems.push(logItem);
-        return logItem;
-    }
-
-    update(dataInstances: TDataInstance[]): OFlowInstance {
-        // iterate flowForm data fields and update from taskData
-        for (const dataInstance of dataInstances) {
-            const foundInstance = this.data.dataInstances.find(dI => dI.name == dataInstance.name);
-            if (!foundInstance) {
-                this.data.dataInstances.push(dataInstance);
+        assertAuthorized(credentialT: t.CredentialT): t.AuditCauseT[] {
+            const payload: t.JSONObjectT = {
+                flowNameT: this.flowConfigT.nameT,
+                neededRolesT: this.flowConfigT.roleNamesT,
             };
-        };
-        return this;
+            return u.assertAuthorized(credentialT, this.flowConfigT.roleNamesT, payload);
+        }
+
+        startForm(): t.NameT {
+            return this.flowConfigT.start.formNameT;
+        }
+
+        startNext(): t.NodeConfigT[] {
+            return this.flowConfigT.start.nextNodesT;
+        }
+
+        flowRoles(): t.NameT[] {
+            return this.flowConfigT.roleNamesT;
+        }
+
+        flowConfig(): t.FlowConfigT {
+            return this.flowConfigT;
+        }
+
+        viewConfigs(formNameT: t.NameT): t.ViewConfigT[] {
+            return this.formViewConfigs.get(formNameT)!;
+        }
+
+        dataConfigs(formNameT: t.NameT): t.DataConfigT[] {
+            return this.formDataConfigs.get(formNameT)!;
+        }
+
+        saveDataConfigs(formNameT: t.NameT): t.DataConfigT[] {
+            return this.formSaveDataConfigs.get(formNameT)!;
+        }
+
+        validate(formNameT: t.NameT, dataItemsT: t.DataItemT[], credentialT: t.CredentialT): t.AuditCauseT[] {
+            const causes: t.AuditCauseT[] = [];
+            const saveDataConfigs = this.saveDataConfigs(formNameT);
+            saveDataConfigs.forEach(dataConfig => causes.push(...validateData(dataConfig, dataItemsT)));
+            if (causes.length) {
+                const payload: t.JSONObjectT = {
+                    credentialT: JSON.parse(JSON.stringify(credentialT)),
+                };
+                this.payload(payload);
+                causes.push(AuditReport.toCause("validation errors", payload));
+                AuditReport.saveReport(credentialT, ...causes);
+            }
+            return causes;
+        }
+
+        startNextNodes(flowInstanceIdT: t.InstanceIdT): void {
+            const nodesT: t.NodeConfigT[] = this.startNext();
+            for (const nodeT of nodesT) {
+                let predicate: boolean = true;
+                if (nodeT.predExpressionT) {
+                    // execute expression and assign result
+                };
+                if (!predicate) continue;
+                switch (nodeT.nodeTypeE) {
+                    case t.NodeTypeE.FORM:
+                        const formInstanceT: t.AtLeastFormInstance = {
+                            nodeConfigT: this.flowConfigT,
+                            flowInstanceIdT: flowInstanceIdT,
+                            flowNameT: this
+                        };
+                        break;
+                    case t.NodeTypeE.JOB:
+                        break;
+                    default:
+                    // error
+                };
+            };
+
+        }
+
+        payload(jsonObjectT: t.JSONObjectT): t.JSONObjectT {
+            const payload: t.JSONObjectT = {
+                nameT: this.flowConfigT.nameT,
+                roleNamesT: this.flowConfigT.roleNamesT,
+                start: this.flowConfigT.start,
+            };
+            jsonObjectT.flowConfigT = payload;
+            return jsonObjectT;
+        }
+
+    }
+
+    export class FlowInstance extends Base<t.InstanceIdT, t.FlowInstanceT> {
+
+
+        constructor(flowInstanceT: t.AtLeast<t.FlowInstanceT, "nameT">) {
+            const dataT: t.FlowInstanceT = {
+                nameT: flowInstanceT.nameT,
+                instanceIdT: flowInstanceT.instanceIdT ?? u.RandomStr(),
+                logItemsT: flowInstanceT.logItemsT ?? [],
+                dataItemsT: flowInstanceT.dataItemsT ?? [],
+                statusE: flowInstanceT.statusE ?? t.FlowStatusE.OPEN,
+                timestamps: {
+                    createdT: u.TimestampStr(),
+                },
+            };
+            super("instanceIdT", dbSaveFlowInstance, dataT);
+            this.freeze(this.isClosed());
+        }
+
+        static getInstance(instanceIdT: t.InstanceIdT): FlowInstance | undefined {
+            return Base.loadInstance(instanceIdT, dbLoadFlowInstance, FlowInstance);
+        }
+
+        getName(): t.NameT {
+            return this.dataT.nameT;
+        }
+
+        isClosed(): boolean {
+            return this.dataT.statusE != t.FlowStatusE.OPEN;
+        }
+
+        close(credentialT: t.CredentialT): FlowInstance {
+            this.dataT.statusE = t.FlowStatusE.CLOSED;
+            this.dataT.timestamps.closedT = u.TimestampStr();
+            this.freeze(this.isClosed());
+            // TODO ???
+            return this;
+        }
+
+        log(credentialT: t.CredentialT, descriptionT: t.DescriptionT): t.LogItemT {
+            const logItemT: t.LogItemT = {
+                timestamp: u.TimestampStr(),
+                credential: credentialT,
+                description: descriptionT,
+            };
+            this.dataT.logItemsT.push(logItemT);
+            return logItemT;
+        }
+
+        dataUpload(dataItemsT: t.DataItemT[]): FlowInstance {
+            // iterate flowForm data fields and update from taskData
+            for (const dataInstance of dataItemsT) {
+                const foundInstance = this.dataT.dataItemsT.find(dataItem => dataItem.name == dataInstance.name);
+                if (!foundInstance) {
+                    this.dataT.dataItemsT.push(dataInstance);
+                };
+            };
+            return this;
+            // redo whole code
+        }
+
+
     }
 
 
 }
-
-
-
 

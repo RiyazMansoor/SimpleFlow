@@ -1,116 +1,81 @@
 
-import * as u from "./utils";
-import * as t from "./types";
-import { OBaseInstance } from "./base";
-import { TCredential } from "./access";
-import { dbLoadError, dbSaveError } from "./store";
+import { OceanFlow as u } from "./utils";
+import { OceanFlow as t } from "./types";
+import { OceanFlow as s } from "./security";
+import { OceanFlow as c } from "./core";
+import { OceanFlow as db } from "./store";
 
 
-////// system audit management => includes logs and errors
-
-// levels of audit
-export enum EAuditType {
-    INFO = "info",                      // for info - reviews are not required
-    ERROR = "error",                    // staff must review and the close
-}
-
-// a single audit can contain may related auditable items
-export type TAuditCause = {
-    description: t.TDescription,        // short description of this item
-    payload: t.JSONObject,              // relevant data payload for this item
-}
-
-// an audit generally requires staff review and closure
-export type TAuditReview = {
-    timestamp: t.TTimestamp,
-    credential: TCredential,            // user making the followup
-    description: t.TDescription,        // short description of this review
-}
-
-// an audit report - comprises of
-// possibly multiple related causes
-// possible multiple staff reviews and closure
-export type TAuditReport = {
-    timestamp: t.TTimestamp,
-    instanceId: t.TInstanceId,
-    type: EAuditType,
-    credential: TCredential,
-    causes: TAuditCause[],
-    reviews: TAuditReview[],
-    closed: boolean,
-}
+export namespace OceanFlow {
 
 
-export class OAuditReport extends OBaseInstance<t.TInstanceId, TAuditReport> {
+    export class AuditReport extends c.Instance<t.InstanceIdT, t.AuditReportT> {
 
 
-    constructor(auditReport: t.AtLeast<TAuditReport, "credential">) {
-        const etype = auditReport.type ?? EAuditType.INFO;
-        const data: TAuditReport = {
-            instanceId: auditReport.instanceId ?? u.RandomStr(20),
-            type: auditReport.type ?? EAuditType.INFO,
-            timestamp: auditReport.timestamp ?? u.TimestampStr(),
-            credential: auditReport.credential,
-            causes: auditReport.causes ?? [],
-            reviews: auditReport.reviews ?? [],
-            closed: auditReport.closed ?? false,
-        };
-        super("instanceId", dbSaveError, data);
-        this.freeze();
+        constructor(auditReportT: t.AtLeastAuditReport) {
+            const dataT: t.AuditReportT = {
+                timestampedT: auditReportT.timestampedT ?? u.TimestampStr(),
+                [t.AuditReportPK]: auditReportT[t.AuditReportPK] ?? u.RandomStr(),
+                auditTypeE: auditReportT.auditTypeE ?? t.AuditTypeE.INFO,
+                credentialT: auditReportT.credentialT,
+                stack: auditReportT.stack ?? "",
+                auditCausesT: auditReportT.auditCausesT ?? [],
+                auditReviewsT: auditReportT.auditReviewsT ?? [],
+                closed: auditReportT.closed ?? false,
+            };
+            if (!dataT.stack) {
+                Error.captureStackTrace(dataT, AuditReport);
+            }
+            super(t.AuditReportPK, db.dbSaveAuditReport, dataT);
+            this.freeze(this.isClosed());
+        }
+
+        static getInstance(instanceId: t.InstanceIdT): AuditReport | undefined {
+            return super.loadInstance(instanceId, db.dbLoadAuditReport, AuditReport);
+        }
+
+        addCauses(...auditCausesT: t.AuditCauseT[]): AuditReport {
+            this.dataT.auditCausesT.push(...auditCausesT);
+            return this;
+        }
+
+        addReveiw(auditReveiwT: t.AuditReviewT): AuditReport {
+            this.dataT.auditReviewsT.push(auditReveiwT);
+            return this;
+        }
+
+        isClosed(): boolean {
+            return this.dataT.closed;
+        }
+
+        close(): AuditReport {
+            this.dataT.closed = true;
+            this.freeze(this.isClosed());
+            return this;
+        }
+
+        static toCause(descriptionT: t.DescriptionT, payloadT: t.JSONObjectT): t.AuditCauseT {
+            const causeT: t.AuditCauseT = {
+                descriptionT: descriptionT,
+                payloadT: payloadT,
+            };
+            return causeT;
+        }
+
+        static toReview(credentialT: t.CredentialT, descriptionT: t.DescriptionT): t.AuditReviewT {
+            const reviewT: t.AuditReviewT = {
+                timestampedT: u.TimestampStr(),
+                credentialT: credentialT,
+                descriptionT: descriptionT,
+            };
+            return reviewT;
+        }
+
+        static saveReport(credential: s.Credential, ...auditCausesT: t.AuditCauseT[]): void {
+            const payload = { credentialT: null };
+            new AuditReport(credential.loadPayload(payload)).addCauses(...auditCausesT).save();
+        }
+
     }
 
-    setCredential(credential: TCredential): void {
-        this.data.credential = credential;
-    }
-
-    addCause(errorIssue: TAuditCause): OAuditReport {
-        this.data.causes.push(errorIssue);
-        return this;
-    }
-
-    getCauses(): TAuditCause[] {
-        return this.data.causes;
-    }
-
-    addFollowup(errorFollowup: TAuditReview): OAuditReport {
-        this.data.reviews.push(errorFollowup);
-        return this;
-    }
-
-    isClosed(): boolean {
-        return this.data.closed;
-    }
-
-    setClosed(): OAuditReport {
-        this.data.closed = true;
-        this.freeze();
-        return this;
-    }
-
-    public static getInstance(errorId: t.TInstanceId): OAuditReport | undefined {
-        return super.loadInstance(errorId, dbLoadError, OAuditReport);
-    }
-
-}
-
-function missing(credential: TCredential, payload: t.JSONObject, description: t.TDescription): TAuditCause[] {
-    const auditCause: TAuditCause = {
-        description: description,
-        payload: {},
-    };
-    Error.captureStackTrace(auditCause.payload, missing);
-    const auditReport: OAuditReport = new OAuditReport({ credential: credential }).addCause(auditCause);
-    auditReport.save();
-    return auditReport.getCauses();
-
-}
-
-export function MissingFlow(credential: TCredential, payload: t.JSONObject): TAuditCause[] {
-    const description: t.TDescription = `flow [${payload.flowName}] not found`;
-    return missing(credential, payload, description);
-}
-
-export function MissingRole(credential: TCredential, payload: t.JSONObject): TAuditCause[] {
-    const description: t.TDescription = `required user role is missing in flow [${payload.flowName}]`;
-    return missing(credential, payload, description);
 }
