@@ -11,6 +11,7 @@ export namespace OceanFlow {
 
     export class AuditReport extends c.Instance<t.InstanceIdT, t.AuditReportT> {
 
+        static fsdbName: any = db.dbAuditReports;
 
         constructor(auditReportT: t.AtLeastAuditReport) {
             const dataT: t.AuditReportT = {
@@ -26,12 +27,12 @@ export namespace OceanFlow {
             if (!dataT.stack) {
                 Error.captureStackTrace(dataT, AuditReport);
             }
-            super(t.AuditReportPK, db.dbSaveAuditReport, dataT);
+            super(t.AuditReportPK, dataT, AuditReport.fsdbName);
             this.freeze(this.isClosed());
         }
 
         static getInstance(instanceId: t.InstanceIdT): AuditReport | undefined {
-            return super.loadInstance(instanceId, db.dbLoadAuditReport, AuditReport);
+            return super.loadInstance(AuditReport.fsdbName, instanceId, AuditReport);
         }
 
         addCauses(...auditCausesT: t.AuditCauseT[]): AuditReport {
@@ -71,9 +72,9 @@ export namespace OceanFlow {
             return reviewT;
         }
 
-        static saveReport(credential: s.Credential, ...auditCausesT: t.AuditCauseT[]): void {
+        static toReport(credential: s.Credential, ...auditCausesT: t.AuditCauseT[]): AuditReport {
             const payload = { credentialT: null };
-            new AuditReport(credential.loadPayload(payload)).addCauses(...auditCausesT).save();
+            return new AuditReport(credential.loadPayload(payload)).addCauses(...auditCausesT);
         }
 
     }

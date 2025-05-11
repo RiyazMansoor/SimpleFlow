@@ -1,7 +1,8 @@
 
 
-import { OceanFlow as t } from "./types";
-import { OceanFlow as s } from "./security";
+// import { OceanFlow as t } from "./types";
+// import { OceanFlow as s } from "./security";
+import { OceanFlow as db } from "./store";
 
 export namespace OceanFlow {
 
@@ -39,24 +40,28 @@ export namespace OceanFlow {
 
     export abstract class Instance<IdT, DataT extends {}> extends Base<IdT, DataT> {
 
-        protected readonly fnSave: FSave<IdT, DataT>;
+        protected readonly fsdb: any;
 
-        constructor(idPropertyName: string, fnSave: FSave<IdT, DataT>, dataT: DataT) {
+        constructor(idPropertyName: string, dataT: DataT, fsdb: any) {
             super(idPropertyName, dataT);
-            this.fnSave = fnSave;
+            this.fsdb = fsdb;
         }
 
         save(): void {
-            this.fnSave(this.getId(), this.dataT);
+            Instance.saveData(this.fsdb, this.getId(), this.dataT);
         }
 
-        static loadData<IdT, DataT>(id: IdT, dbLoad: FLoad<IdT, DataT>): DataT | undefined {
-            const dataT: DataT | undefined = dbLoad(id);
+        static saveData<IdT, DataT>(fsdb: any, id: IdT, dataT: DataT): void {
+            db.dbSave(fsdb, id, dataT);
+        }
+
+        static loadData<IdT, DataT>(fsdb: any, id: IdT): DataT | undefined {
+            const dataT: DataT | undefined = db.dbLoad(fsdb, id);
             return dataT;
         }
 
-        static loadInstance<TId, DataT, Class>(id: TId, dbLoad: FLoad<TId, DataT>, clazz: Constructor<Class, DataT>): Class | undefined {
-            const dataT: DataT | undefined = Instance.loadData(id, dbLoad);
+        static loadInstance<TId, DataT, Class>(fsdb: any, id: TId, clazz: Constructor<Class, DataT>): Class | undefined {
+            const dataT: DataT | undefined = Instance.loadData(fsdb, id);
             if (dataT) {
                 return new clazz(dataT);
             }
@@ -91,61 +96,5 @@ export namespace OceanFlow {
 
     }
 
-    class Context {
-
-        private readonly contextT: t.ContextT;
-
-        private readonly credential: s.Credential;
-
-        private constructor(contextT: t.ContextT) {
-            this.contextT = contextT;
-            // checking user-id (emailIdT)
-            const credentialEmailIdT: t.EmailT = contextT[t.CredentialPK];
-            if (credentialEmailIdT) {
-                const temp = s.Credential.getInstance(credentialEmailIdT);
-                if (temp) {
-                    this.credential = temp;
-                };
-            } else {
-                this.credential = new s.Credential(t.PublicCredential);
-            };
-            // if no credential generated => abort process
-            if (!this.credential) {
-                return;
-            };
-            // fill other context variables
-            const formInstanceIdT = contextT[t.FormInstancePK];
-            navigator.Form
-        }
-
-        static get(contextT: t.ContextT): t.AuditCauseT[] {
-            const context = new Context(contextT);
-            // checking user-id (emailIdT)
-            if (!context.getCredential()) {
-
-            }
-
-            const credentialEmailIdT: t.EmailT = contextT[t.CredentialPK];
-            if (credentialEmailIdT) {
-
-            }
-            const credb = new s.Credential(t.PublicCredential)
-            if (!contextT[t.CredentialPK]) {
-                creds = new s.Credential(t.PublicCredential);
-            } else {
-                creds = s.Credential.getInstance(context[t.CredentialPK]);
-                if (!credential) {
-                    contextPropertyValueNotFound("userEmail", context);
-                    return;
-                };
-            }
-            context.credential = credential;
-
-        }
-
-        getCredential(): s.Credential {
-            return this.credential;
-        }
-    }
 
 }

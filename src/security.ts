@@ -9,17 +9,19 @@ export namespace OceanFlow {
 
     export class Role extends c.Instance<t.NameT, t.RoleT> {
 
+        static fsdbName: any = db.dbRoles;
+
         constructor(roleT: t.AtLeastRole) {
             const dataT: t.RoleT = {
-                nameT: roleT.nameT,
+                roleNameIdT: roleT.roleNameIdT,
                 descriptionT: roleT.descriptionT,
                 enabled: roleT.enabled ?? true,
             };
-            super(t.RolePK, db.dbSaveRole, dataT);
+            super(t.RolePK, dataT, Role.fsdbName);
         }
 
         static getInstance(roleNameT: t.NameT): Role | undefined {
-            return super.loadInstance(roleNameT, db.dbLoadRole, Role);
+            return super.loadInstance(Role.fsdbName, roleNameT, Role);
         }
 
         getDescription(): t.DescriptionT {
@@ -45,16 +47,18 @@ export namespace OceanFlow {
 
     export class Login extends c.Instance<t.EmailT, t.LoginT> {
 
+        static fsdbName: any = db.dbLogins;
+
         constructor(loginT: t.AtLeastLogin) {
             const dataT: t.LoginT = {
-                emailT: loginT.emailT,
+                [t.LoginPK]: loginT[t.LoginPK],
                 passwordT: loginT.passwordT,
             };
-            super(t.LoginPK, db.dbSaveUser, dataT);
+            super(t.LoginPK, dataT, Login.fsdbName);
         }
 
         static getInstance(emailT: t.EmailT): Login | undefined {
-            return super.loadInstance(emailT, db.dbLoadUser, Login);
+            return super.loadInstance(Login.fsdbName, emailT,  Login);
         }
 
         setPassword(passwordT: t.PasswordT): Login {
@@ -70,19 +74,21 @@ export namespace OceanFlow {
 
     export class Credential extends c.Instance<t.EmailT, t.CredentialT> {
 
+        static fsdbName: any = db.dbCredentials;
+
         constructor(credentialT: t.AtLeastCredential) {
             const dataT: t.CredentialT = {
-                emailT: credentialT.emailT,
-                nameT: credentialT.nameT,
+                [t.LoginPK]: credentialT[t.LoginPK],
+                userNameT: credentialT.userNameT,
                 hasRoleNamesT: credentialT.hasRoleNamesT ?? [],
                 enabled: credentialT.enabled ?? true,
                 updatedT: credentialT.updatedT ?? [],
             };
-            super(t.CredentialPK, db.dbSaveCredential, dataT);
+            super(t.LoginPK, dataT, Credential.fsdbName);
         }
 
         static getInstance(emailT: t.EmailT): Credential | undefined {
-            return super.loadInstance(emailT, db.dbLoadCredential, Credential);
+            return super.loadInstance(Credential.fsdbName, emailT, Credential);
         }
 
         addRole(roleNameT: t.NameT): Credential {

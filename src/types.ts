@@ -61,20 +61,19 @@ export namespace OceanFlow {
     export type AtLeastLogin = AtLeast<LoginT, typeof LoginPK | "passwordT">;
 
     // active roles a user has
-    export const CredentialPK = "credentialEmailIdT";
     export type CredentialT = {
-        [CredentialPK]: EmailT,                     // primary key
         [LoginPK]: NameT,                       // from TUser
+        userNameT: NameT,                  // from TUser
         hasRoleNamesT: NameT[],             // from TRole
         enabled: boolean,
         updatedT: TimestampT[],             // list of last updated timestamps
     };
-    export type AtLeastCredential = AtLeast<CredentialT, typeof CredentialPK | typeof LoginPK>
+    export type AtLeastCredential = AtLeast<CredentialT, typeof LoginPK | "userNameT">
 
     // this credential is used for public available services
     export const PublicCredential: CredentialT = {
-        [CredentialPK]: "public@flow.com",
-        [LoginPK]: "Public User",
+        [LoginPK]: "public@flow.com",
+        userNameT: "Public User",
         hasRoleNamesT: ["public"],
         enabled: true,
         updatedT: [],
@@ -83,8 +82,8 @@ export namespace OceanFlow {
 
     // this credential is used for system internal services
     export const SystemCredential: CredentialT = {
-        [CredentialPK]: "system@flow.com",
-        [LoginPK]: "System User",
+        [LoginPK]: "system@flow.com",
+        userNameT: "System User",
         hasRoleNamesT: ["system"],
         enabled: true,
         updatedT: [],
@@ -281,12 +280,14 @@ export namespace OceanFlow {
     export const NodeConfigPK = "nodeNameIdT";
     export type NodeConfigT = {
         [NodeConfigPK]: NameT,              // name of node - eg: form-name or job-name
-        flowNameIdT: NameT,
+        [FlowConfigPK]: NameT,
         nodeTypeE: NodeTypeE,               // type of node
         predExpressionT: ExpressionT,       // boolean expression to proceed or not    
         roleNamesT: NameT[],                // authorised roles for this node
         nextNodesT: NodeConfigT[],          // multpe nodes may follow
     };
+
+    export type AtLeastNodeInstance = AtLeast<NodeConfigT, typeof NodeConfigPK | typeof FlowConfigPK>;
 
     ////// Jobs - a node type executed by the system
 
@@ -298,9 +299,8 @@ export namespace OceanFlow {
         SKIPPED,        // a human intervention - skips the job and moves next
     }
 
-    export type JobAttemptsT = {
-        timestamped: TimestampT,
-        result: DescriptionT,
+    export type JobAttemptsT = AuditCauseT & {
+        timestampedT: TimestampT,
     }
 
     export const JobInstancePK = "jobInstanceIdT";
@@ -360,8 +360,9 @@ export namespace OceanFlow {
     ////// the flow configuration
 
     //// configuration settings for a flow type
+    export const FlowConfigPK = "flowNameIdT"; 
     export type FlowConfigT = {
-        flowNameT: NameT,                       // flow name
+        [FlowConfigPK]: NameT,              // flow name
         roleNamesT: NameT[],                // roles that can start the flow
         start: {
             formNameT: NameT,              // kick start data input as contained in form
