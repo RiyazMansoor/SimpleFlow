@@ -2,8 +2,8 @@
 
 // fetchFlow :: exists-flowConfig | has-Access | exec-function  
 import { OceanFlow as u } from "./utils";
-import { OceanFlow as t } from "./types";
-import { OceanFlow as s } from "./security";
+import { OceanFlow as t } from "../types";
+import { OceanFlow as s } from "../security";
 
 
 export namespace OceanFlow {
@@ -58,7 +58,7 @@ export namespace OceanFlow {
         const viewConfigs = flowConfig.viewConfigs(formName);
         const dataConfigs = flowConfig.dataConfigs(formName);
         const response: t.ResponseT = {
-            data: {
+            form: {
                 viewConfigs: viewConfigs,
                 dataConfigs: dataConfigs,
                 dataItems: [],

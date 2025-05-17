@@ -7,6 +7,6 @@
       "outFile": "test/client/rmforms.js",
       "sourceMap": true
     },
-    "include": ["src/client/**/*"],
+    "include": ["src/**/*"],
     "exclude": ["**/*.spec.ts"]
 }

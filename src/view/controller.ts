@@ -1,8 +1,8 @@
 
-import { TDataInstance, TFlowInstance } from "./flows";
-import { dbAsCredential, dbAsFlowSpec } from "./store";
+import { TDataInstance, TFlowInstance } from "../flows";
+import { dbAsCredential, dbAsFlowSpec } from "../store";
 import { TTaskInstance } from "./tasks";
-import { ETaskAction, TBusinessContext, TCredential, TEmail, TFlowSpec, TInstanceId, TName, TUser } from "./types";
+import { ETaskAction, TBusinessContext, TCredential, TEmail, TFlowSpec, TInstanceId, TName, TUser } from "../types";
 
 
 // must be logged in
