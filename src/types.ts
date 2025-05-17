@@ -6,6 +6,14 @@
 
 export namespace OceanFlow {
 
+    // Regex expressions
+    export const RegexEmail = "[\\w.+-]+@[\\w.-]+\\.[\\w]{2,4}";
+    export const RegexInteger = "[-+]?\\d+";
+    export const RegexDecimal = "[-+]?\\d+(\\.\\d+)?";
+    export const RegexAlphaNumeric = "\\w+";
+    export const RegexIdentity = "A[\\d]{6}";
+    export const RegexPhone = "[\\d]{3}[ -]?[\\d]{4}";
+
     // The basic types used in the application
     export type IntegerT = number;
     export type DecimalT = number;
@@ -27,6 +35,10 @@ export namespace OceanFlow {
     export type ExpressionT = string;
     export type InstanceIdT = string;
 
+    export type TitleT = {
+        titleT: NameT,
+        descriptionT: DescriptionT,
+    };
 
     ////// json data
 
@@ -50,7 +62,7 @@ export namespace OceanFlow {
         descriptionT: DescriptionT,
         enabled: boolean,
     };
-    export type AtLeastRole = AtLeast<RoleT, typeof RolePK | "descriptionT">
+    export type AtLeastRoleT = AtLeast<RoleT, typeof RolePK | "descriptionT">
 
     // user login access
     export const LoginPK = "loginEmailIdT";
@@ -58,39 +70,45 @@ export namespace OceanFlow {
         [LoginPK]: EmailT,                     // primary key
         passwordT: PasswordT,               // stored in hashed form
     };
-    export type AtLeastLogin = AtLeast<LoginT, typeof LoginPK | "passwordT">;
+    export type AtLeastLoginT = AtLeast<LoginT, typeof LoginPK | "passwordT">;
 
     // active roles a user has
-    export type CredentialT = {
+    export const RoleNamesProperty = "roleNamesT";
+    export type SecureRoleT = {
+        [RoleNamesProperty]: NameT[],             // from TRole
+    };
+
+    export type CredentialT = SecureRoleT & {
         [LoginPK]: NameT,                       // from TUser
         userNameT: NameT,                  // from TUser
-        hasRoleNamesT: NameT[],             // from TRole
         enabled: boolean,
         updatedT: TimestampT[],             // list of last updated timestamps
     };
-    export type AtLeastCredential = AtLeast<CredentialT, typeof LoginPK | "userNameT">
+    export type AtLeastCredentialT = AtLeast<CredentialT, typeof LoginPK | "userNameT">
 
     // this credential is used for public available services
-    export const PublicCredential: CredentialT = {
+    export const PublicCredentialT: CredentialT = {
         [LoginPK]: "public@flow.com",
         userNameT: "Public User",
-        hasRoleNamesT: ["public"],
+        [RoleNamesProperty]: ["public"],
         enabled: true,
         updatedT: [],
     };
-    Object.freeze(PublicCredential);
+    Object.freeze(PublicCredentialT);
 
     // this credential is used for system internal services
-    export const SystemCredential: CredentialT = {
+    export const SystemCredentialT: CredentialT = {
         [LoginPK]: "system@flow.com",
         userNameT: "System User",
-        hasRoleNamesT: ["system"],
+        [RoleNamesProperty]: ["system"],
         enabled: true,
         updatedT: [],
     };
-    Object.freeze(SystemCredential);
+    Object.freeze(SystemCredentialT);
 
 
+    //// instance class signature
+    export type Constructor<Class, DataT> = new (dataT: DataT) => Class;
 
     ////// system audit management => includes logs and errors
 
@@ -113,10 +131,10 @@ export namespace OceanFlow {
         descriptionT: DescriptionT,         // short description of this review
     };
 
-
     // an audit report - comprises of
-    // possibly multiple related causes
-    // possible multiple staff reviews and closure
+    // stack trace
+    // one or more  related causes
+    // one or more staff reviews and closure
     export const AuditReportPK = "auditReportInstanceIdT";
     export type AuditReportT = {
         timestampedT: TimestampT,
@@ -128,7 +146,24 @@ export namespace OceanFlow {
         auditReviewsT: AuditReviewT[],
         closed: boolean,
     };
-    export type AtLeastAuditReport = AtLeast<AuditReportT, "credentialT">;
+    export type AtLeastAuditReportT = AtLeast<AuditReportT, "credentialT">;
+
+
+    ////// data configuration and data entry
+
+    //// supported data types 
+    export enum DataTypeE {
+        INTEGER,
+        DECIMAL,
+        DATE,
+        TIME,
+        TIMESTAMP,
+        EMAIL,
+        PASSWORD,
+        TEXT,
+        PARAGRAPH,
+    };
+
 
 
     //// data validtion parameters
@@ -142,50 +177,77 @@ export namespace OceanFlow {
         timeRange?: { min?: IntegerT, max?: IntegerT },     // in minutes
     };
 
-    //// supported data types 
-    export enum DataTypeE {
-        INTEGER,
-        DECIMAL,
-        DATE,
-        TIME,
-        TIMESTAMP,
-        EMAIL,
-        PASSWORD,
-    }
-
     //// configuration of data items in the flow
     //// name is used as an unique identifier in flow
     //// data validations are specified here
-    export const DataConfigPK = "dataNamePK";
+    export const DataConfigPK = "dataNameIdT";
     export type DataConfigT = {
         [DataConfigPK]: NameT,
-        dataType: DataTypeE,
-        validations?: ValidationT,
-    }
+        dataTypeE: DataTypeE,
+        validations?: ValidationT,          // validations can be optional
+    };
 
-    //// a data item used throughout
-    //// name must matches respective data-config
-    export type DataItemT = {
+    //// a user data entry - used throughout this application
+    //// name must match respective data-config
+    export type DataInstanceT = {
         [DataConfigPK]: NameT,
         dataValue: string | number | boolean,
-    }
+    };
+
+
+    ////// nodes on the flow graph
+
+    // there could be many types of nodes
+    export enum NodeTypeE {
+        FORM,
+        JOB,
+    };
+
+    // a node configuration on the flow graph
+    export const NodeConfigPK = "nodeNameIdT";
+    export type NodeConfigT = {
+        [NodeConfigPK]: NameT,              // name of node - eg: form-name or job-name
+        [FlowConfigPK]: NameT,
+        nodeTypeE: NodeTypeE,               // type of node
+        predExpressionT: ExpressionT,       // boolean expression to proceed or not    
+        roleNamesT: NameT[],                // authorised roles for this node
+        nextNodesT: NameT[],          // multpe nodes may follow
+    };
+
+
+    export type DataConfigMapT = {
+        [taskDataNameT: NameT]: NameT,
+    };
+
+    export type DataInstanceMapT = {
+        [taskDataNameT: NameT]: DataInstanceT,
+    };
+
+    //// a specific node type - system work/job 
+    export type TaskConfigT = NodeConfigT & {
+        // this is map to  extract the data values from the flow
+        // every data name required by the work/job => mapped to the data name of the flow
+        taskFunction: "",
+        dataMapT: DataConfigMapT,
+    };
+
 
 
     ////// being form render specification
 
     //// rendering widget - typically html
-    export enum WidgetTypeE {
+    export enum HTMLTypeE {
         EMAIL,
         TEXT,
         TEXTAREA,
         DROPDOWN,
         LISTBOX,
-        RADIOBUTTONS,
-        CHECKBOXES,
-    }
+        RADIOBUTTON,
+        CHECKBOX,
+    };
 
     //// the width of the widget - allows multiple widgets on a line
-    export enum WidgetWidthE {
+    export enum HTMLWidthE {
         FULL,
         HALF,
         THIRD,
@@ -193,18 +255,13 @@ export namespace OceanFlow {
         FOURTH,
         THREEFOURTH,
         REST,
-    }
+    };
 
-    //// how the widget is rendered
-    export enum WidgetAccessE {
-        ENABLED,
-        DISABLED,
-        HIDDEN,
-    }
-
-    export const WidgetConfigPK = "widgetNameIdT";
-    export type WidgetConfigT = {
-        [WidgetConfigPK]: NameT,
+    //// rendering of a control or component
+    //// the configuration will contain one of three (paragraph, component, custom) 
+    export const HTMLConfigPK = "htmlNameIdT";
+    export type HTMLConfigT = {
+        [HTMLConfigPK]: NameT,
         // force a new line widget
         paragraph?: boolean,
         // pre built component with multiple widgets that can map multiple fields
@@ -217,108 +274,73 @@ export namespace OceanFlow {
             dataNameT: NameT,                // name of the data-item
             defaultValueT?: string,          // a default value to render
             labelT: NameT,                  // label displayed for this field
-            widgetTypeE: WidgetTypeE,
-            widgetWidthE: WidgetWidthE,
+            toolTypeE: HTMLTypeE,
+            toolWidthE: HTMLWidthE,
             list?: [NameT, string][],
         },
     };
-    export const ParagraphWidgetConfigT: WidgetConfigT = {
-        [WidgetConfigPK]: "paragraph",
+    //// a constant ctrl for new line/para during rendering
+    export const ParagraphHTMLConfigT: HTMLConfigT = {
+        [HTMLConfigPK]: "paragraph",
         paragraph: true,
     };
 
-    export type WidgetDisplay = {
-        [WidgetConfigPK]: NameT,
-        display: WidgetAccessE,
-    };
-    export type GroupingConfigT = {
-        groupingNameT: NameT,
-        widgetNamesT: WidgetDisplay[],
+    //// how a ctrl will be rendered
+    export type FormComponentT = {
+        [HTMLConfigPK]: NameT,
+        enabled: boolean,                   // control is enabled, else disabled
+        isFlowData: boolean,                // data that will be uploaded flow data
     };
 
-    export type FormConfigT = {
-        formNameT: NameT,
-        groupingNamesT: GroupingConfigT[],
-    }
-
-
-
-    // every data-item is render settings
-    // export type ViewConfigT = {
-    //     forms: {
-    //         nameT: NameT,                   // same as form-name
-    //         accessE: WidgetAccessE,         // if editable is a/are flow saved fields
-    //         isFlowData: boolean,            // indicator that this/these are flow saved fields
-    //     }[],
-    //     // pre built component with multiple widgets that can map multiple fields
-    //     component?: {
-    //         groupNameT: NameT,              // a grouping flag when displayed
-    //         componentNameT: NameT,          // name of the pre-built component
-    //         dataNames: NameT[],             // todo - how to match component fields
-    //     },
-    //     // a single widget for a single field
-    //     custom?: {
-    //         groupNameT: NameT,
-    //         dataName: NameT,                // name of the data-item
-    //         defaultValue?: string,          // a default value to render
-    //         labelT: NameT,                  // label displayed for this field
-    //         widgetTypeE: WidgetTypeE,
-    //         widgetWidthE: WidgetWidthE,
-    //         //        list?: KeyValue[],
-    //     },
-    // }
-
-
-    ////// nodes on the flow graph
-
-    // there could be many types of nodes
-    export enum NodeTypeE {
-        FORM,
-        JOB,
+    //// rendering a related controls in a segments of a form
+    export type FormSegmentT = {
+        titleT: TitleT,
+        formCompnentsT: FormComponentT[],
     };
 
-    export const NodeConfigPK = "nodeNameIdT";
-    export type NodeConfigT = {
-        [NodeConfigPK]: NameT,              // name of node - eg: form-name or job-name
-        [FlowConfigPK]: NameT,
-        nodeTypeE: NodeTypeE,               // type of node
-        predExpressionT: ExpressionT,       // boolean expression to proceed or not    
-        roleNamesT: NameT[],                // authorised roles for this node
-        nextNodesT: NodeConfigT[],          // multpe nodes may follow
+    //// a specific node type - user input form-config as a node on the work flow tree
+    export type FormConfigT = NodeConfigT & {
+        titleT: TitleT,
+        formSegmentsT: FormSegmentT[],
     };
 
-    export type AtLeastNodeInstance = AtLeast<NodeConfigT, typeof NodeConfigPK | typeof FlowConfigPK>;
+    export type FormRenderingT = {
+        titleT: TitleT,
+        segmentsT: FormSegmentT[],
+        hmtlConfigNamesT: NameT[],
+        dataConfigNamesT: NameT[],
+    };
 
-    ////// Jobs - a node type executed by the system
 
+    //// node-instance is an "abstract" type.
+    //// extension like job/form have the implementation
+    export const NodeInstancePK = "nodeInstanceIdT";
+    export type NodeInstanceT = {
+        timestampedT: TimestampT,
+        [NodeInstancePK]: InstanceIdT,
+        [NodeConfigPK]: NameT,
+        [FlowInstancePK]: NameT,
+    };
+    export type AtLeastNodeInstance = AtLeast<NodeInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
 
     //// the status of a job
-    export enum JobStatusE {
+    export enum TaskStatusE {
         OPEN,           // job has been created - an active state
         CLOSED,         // job has been completed and closed normally
         SKIPPED,        // a human intervention - skips the job and moves next
     }
 
-    export type JobAttemptsT = AuditCauseT & {
+    export type TaskAttemptT = AuditCauseT & {
         timestampedT: TimestampT,
     }
 
-    export const JobInstancePK = "jobInstanceIdT";
-    export type JobInstanceT = {
-        timestampedT: TimestampT,
-        [NodeConfigPK]: NameT,
-        [JobInstancePK]: InstanceIdT,
-        flowInstanceIdT: InstanceIdT,       // flow-instance this form belongs to
-        flowNameT: NameT,                   // quick access flow-name
-        attemptsT: JobAttemptsT[],           // users access form
-        statusE: JobStatusE,
+    export type TaskInstanceT = NodeInstanceT & {
+        attemptsT: TaskAttemptT[],           // users access form
+        statusE: TaskStatusE,
     };
-    export type AtLeastJobInstance = AtLeast<JobInstanceT, typeof NodeConfigPK | "flowInstanceIdT">;
+    export type AtLeastTaskInstanceT = AtLeast<TaskInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
 
 
-    //// begin form specification
-    //// a form is a unit of work that a user performs part of a workflow
-    //// a form definition defines the work to be done
 
     //// the status of a form-instance
     export enum FormStatusE {
@@ -341,37 +363,27 @@ export namespace OceanFlow {
     }
 
     // 
-    export const FormInstancePK = "formInstanceIdT";
-    export type FormInstanceT = {
-        timestampedT: TimestampT,
-        [FormInstancePK]: InstanceIdT,
-        flowInstanceIdT: InstanceIdT,       // flow-instance this form belongs to
-        flowNameT: NameT,                   // quick access flow-name
-        nodeConfigT: NodeConfigT,           // a copy of form-config hardcorded on creation
-        formNameT: NameT,
+    export type FormInstanceT = NodeInstanceT & {
         accessesT: FormAccessT[],           // users access form
         statusE: FormStatusE,
         currentUserEmailT: EmailT,          // easy access to last user (db filtering)
-        tempDataItemsT: DataItemT[],        // when user saves form for later
-    }
-    export type AtLeastFormInstance = AtLeast<FormInstanceT, "nodeConfigT" | "flowInstanceIdT" | "flowNameT">;
+        tempDataItemsT: DataInstanceT[],        // when user saves form for later
+    };
+    export type AtLeastFormInstanceT = AtLeast<FormInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
 
 
     ////// the flow configuration
 
     //// configuration settings for a flow type
-    export const FlowConfigPK = "flowNameIdT"; 
+    export const FlowConfigPK = "flowNameIdT";
     export type FlowConfigT = {
         [FlowConfigPK]: NameT,              // flow name
-        roleNamesT: NameT[],                // roles that can start the flow
-        start: {
-            formNameT: NameT,              // kick start data input as contained in form
-            nextNodesT: NodeConfigT[],
-        },
+        startFormNameT: NameT,                  // kick start data input as contained in form
         dataConfigsT: DataConfigT[],        // every data item has its own data/validation
-        // viewConfigsT: ViewConfigT[],        // every data item has its won view/rendering
-        nodeConfigsT: NodeConfigT[],        // user input tasks 
-    }
+        htmlConfigsT: HTMLConfigT[],        // 
+        formConfigsT: FormConfigT[],        // all the forms in this flow
+        taskConfigsT: TaskConfigT[],        // all the form widgets in this flow
+    };
 
     //// status of a flow instance
     export enum FlowStatusE {
@@ -387,23 +399,25 @@ export namespace OceanFlow {
         credential: CredentialT,            // who was active when log generated
         form?: {                           // for form related logs
             instanceId: InstanceIdT,        // for instance id
-            formData: DataItemT[],          // data received from a form
+            formData: DataInstanceT[],          // data received from a form
         },
     }
 
     //// flow-instance spawned by respective flow-config
+    export const FlowInstancePK = "flowInstanceIdT";
     export type FlowInstanceT = {
-        instanceIdT: InstanceIdT,
-        nameT: NameT,                        // form-config name that spawned this instance
+        [FlowInstancePK]: InstanceIdT,
+        [FlowConfigPK]: NameT,                        // form-config name that spawned this instance
         timestamps: {
             createdT: TimestampT,
             closedT?: TimestampT,
             abortedT?: TimestampT,
         },
         logItemsT: LogItemT[],
-        dataItemsT: DataItemT[],
+        dataItemsT: DataInstanceT[],
         statusE: FlowStatusE,
-    }
+    };
+    export type AtLeastFlowInstance = AtLeast<FlowInstanceT, typeof FlowConfigPK>;
 
 
     //// this part defines the execution pipeline for user service requests
@@ -427,7 +441,7 @@ export namespace OceanFlow {
         flowName?: NameT,                   // needed for flow start actions
 
         formName?: NameT,
-        dataItems?: DataItemT[],            // needed for all form submissions
+        dataItems?: DataInstanceT[],            // needed for all form submissions
         credential?: Credential,            // created 
         // flowConfig?: FlowConfig,            // created if needed 
         // flowInstance?: FlowInstance,        // created if needed
@@ -443,13 +457,14 @@ export namespace OceanFlow {
     ////// response object received by clients
     export type ResponseT = {
         error?: AuditCauseT[],              // if errors occurred
-        data?: {                            // of if screen rendering
-            // viewConfigs: ViewConfigT[],
-            dataConfigs: DataConfigT[],
-            dataItems: DataItemT[],
+        form?: {
+            formTitleT: TitleT,
+            formSegmentsT: FormSegmentT[],   // provides form structure and elements
+            htmlConfigsT: HTMLConfigT[],     // element structure to render
+            dataConfigsT: DataConfigT[],     // the forms data elements and data validation
+            dataInstancesT: DataInstanceT[], // forms data values if available
         },
     }
-
 
 
 
