@@ -10,37 +10,46 @@ import { OceanFlow as c } from "./configs";
 export namespace OceanFlow {
 
     /**
-     * Base for all entities with a primary key.
-     * [IdT] is the type of the primary key field
+     * Base read-only generic class for all entities.
+     * <IdT> is the type of the primary key field
+     * <DataT> is the json data object
      */
-    export abstract class Entity implements d.Entity {
+    export abstract class Entity<IdT, DataT extends { [key: string]: any }>
+        implements d.Entity<IdT, DataT> {
 
         // the property name of the primary key field in data
         protected readonly idPropertyName: string;
 
         // the json data object
-        protected readonly dataT: t.BaseT;
+        protected readonly dataT: DataT;
 
         /**
          * @param idPropertyName the property name of the primary key field in data
          * @param dataT the json data object
          */
-        constructor(idPropertyName: string, dataT: t.BaseT) {
+        constructor(idPropertyName: string, dataT: DataT) {
             this.idPropertyName = idPropertyName;
             this.dataT = dataT;
         }
 
-        getIdT(): string {
+        getIdT(): IdT {
             return this.dataT[this.idPropertyName];
         }
+
+        // getDataT(): DataT {
+        //     return this.dataT;
+        // }
 
     }
 
     /**
-     * Savable base for all entities.
-     * [IdT] is the type of the primary key field
+     * Base read-write generic class for all entities.
+     * <IdT> is the type of the primary key field
+     * <DataT> is the json data object
      */
-    export abstract class SavableEntity extends Entity implements d.Savable {
+    export abstract class SavableEntity<IdT, DataT extends {}>
+        extends Entity<IdT, DataT>
+        implements d.SavableEntity<IdT, DataT> {
 
         // data-store - this is temporary. TODO move to database. 
         private readonly fsdb: any;
@@ -50,7 +59,7 @@ export namespace OceanFlow {
          * @param dataT the json data object
          * @param fsdb [temp] data store
          */
-        constructor(idPropertyName: string, dataT: t.BaseT, fsdb: any) {
+        constructor(idPropertyName: string, dataT: DataT, fsdb: any) {
             super(idPropertyName, dataT);
             this.fsdb = fsdb;
         }
@@ -106,71 +115,71 @@ export namespace OceanFlow {
     /**
      * Convenient abstract configuration class for all flow sub configurations
      */
-    // export abstract class ConfigEntity<ConfigT extends {}>
-    //     extends Entity<t.NameT, ConfigT> {
+    export abstract class ConfigEntity<ConfigT extends {}>
+        extends Entity<t.NameT, ConfigT> {
 
-    //     /**
-    //      * the parent flow configuration object
-    //      */
-    //     protected readonly flowConfig: c.FlowConfig;
+        /**
+         * the parent flow configuration object
+         */
+        protected readonly flowConfig: c.FlowConfig;
 
-    //     /**
-    //      * @param idPropertyNameT property name of the primary key of json data object
-    //      * @param configT the json data object
-    //      * @param flowConfig the parent flow configuration object
-    //      */
-    //     constructor(idPropertyNameT: t.NameT, configT: ConfigT, flowConfig: c.FlowConfig) {
-    //         super(idPropertyNameT, configT);
-    //         this.flowConfig = flowConfig;
-    //     }
+        /**
+         * @param idPropertyNameT property name of the primary key of json data object
+         * @param configT the json data object
+         * @param flowConfig the parent flow configuration object
+         */
+        constructor(idPropertyNameT: t.NameT, configT: ConfigT, flowConfig: c.FlowConfig) {
+            super(idPropertyNameT, configT);
+            this.flowConfig = flowConfig;
+        }
 
-    // }
+    }
 
     /**
      * Classes that provide security authentication to operate on.
      * <IdT> is the type of the primary key field
      * <DataT> is the json data object
      */
-    // export class SecurableConfigEntity<DataT extends t.SecurableT>
-    //     extends ConfigEntity<DataT>
-    //     implements d.Securable<t.NameT, DataT> {
+    export class SecurableConfigEntity<DataT extends t.SecurableT>
+        extends ConfigEntity<DataT>
+        implements d.Securable<t.NameT, DataT> {
 
-    //     /**
-    //      * 
-    //      * @param idPropertyName the property name of the primary key field in data
-    //      * @param dataT the json data object
-    //      * @param flowConfig the parent flow configuration object
-    //      */
-    //     constructor(idPropertyName: string, dataT: DataT, flowConfig: c.FlowConfig) {
-    //         super(idPropertyName, dataT, flowConfig);
-    //     }
+        /**
+         * 
+         * @param idPropertyName the property name of the primary key field in data
+         * @param dataT the json data object
+         * @param flowConfig the parent flow configuration object
+         */
+        constructor(idPropertyName: string, dataT: DataT, flowConfig: c.FlowConfig) {
+            super(idPropertyName, dataT, flowConfig);
+        }
 
-    //     /**
-    //      * @see const [RoleNamesProperty] from types
-    //      * @returns the authorized role-names for this object
-    //      */
-    //     hasRoles(): t.NameT[] {
-    //         return this.dataT[t.RoleNamesProperty];
-    //     }
+        /**
+         * @see const [RoleNamesProperty] from types
+         * @returns the authorized role-names for this object
+         */
+        hasRoles(): t.NameT[] {
+            return this.dataT[t.RoleNamesProperty];
+        }
 
-    //     /**
-    //      * Asserts the supplied credential has access to this object.
-    //      * @param credential the credential of a public or logged in user
-    //      * @returns arry of issues found
-    //      */
-    //     assertRole(credential: s.Securable): t.AuditCauseT[] {
-    //         return hasAccess(this, credential);
-    //     }
+        /**
+         * Asserts the supplied credential has access to this object.
+         * @param credential the credential of a public or logged in user
+         * @returns arry of issues found
+         */
+        assertRole(credential: s.Securable): t.AuditCauseT[] {
+            return hasAccess(this, credential);
+        }
 
-    //     /**
-    //      * @returns the json object data record
-    //      */
-    //     getDataT(): DataT {
-    //         return this.dataT;
-    //     }
+        /**
+         * @returns the json object data record
+         */
+        getDataT(): DataT {
+            return this.dataT;
+        }
 
 
-    // }
+    }
 
 
     /**
@@ -180,22 +189,22 @@ export namespace OceanFlow {
      * <DataT> is the json data object
      * <T> any object that extends ReadBase with underlying [DataT] json object
      */
-    // export class EntityMap<DataT extends {}, T extends Entity<t.NameT, DataT>> extends Map<t.NameT, T> {
+    export class EntityMap<DataT extends {}, T extends Entity<t.NameT, DataT>> extends Map<t.NameT, T> {
 
-    //     // default constructor
-    //     constructor() {
-    //         super();
-    //     }
+        // default constructor
+        constructor() {
+            super();
+        }
 
-    //     /**
-    //      * Convenience method to add many objects at once.
-    //      * @param ts objects extending [ReadBase]
-    //      */
-    //     setAll(...ts: T[]): void {
-    //         ts.forEach(t => this.set(t.getIdT(), t));
-    //     }
+        /**
+         * Convenience method to add many objects at once.
+         * @param ts objects extending [ReadBase]
+         */
+        setAll(...ts: T[]): void {
+            ts.forEach(t => this.set(t.getIdT(), t));
+        }
 
-    // }
+    }
 
 
     //// utility functions ////
@@ -219,21 +228,16 @@ export namespace OceanFlow {
         return rstr.substring(0, 40);
     }
 
-    export function hasAccess(accessing: d.Securable, credential: d.Securable): t.AuditCauseT[] {
+    export function hasAccess<IdT, DataT extends {}>
+        (accessing: d.Securable<IdT, DataT>, credential: d.Securable<t.EmailT, t.CredentialT>): t.AuditCauseT[] {
         const auditCauses: t.AuditCauseT[] = [];
-        const commonRoles = accessing.hasRoleNamesT().filter(role1T => credential.hasRoleNamesT().includes(role1T));
+        const commonRoles = accessing.hasRoles().filter(role1T => credential.hasRoles().includes(role1T));
         if (commonRoles.length == 0) {
             const auditCause: t.AuditCauseT = {
                 descriptionT: "authorization failed",
                 payloadT: {
-                    accessing: {
-                        loginEmailIdT: accessing.getIdT(),
-                        roleNamesT: accessing.hasRoleNamesT(),
-                    },
-                    credential: {
-                        loginEmailIdT: credential.getIdT(),
-                        roleNamesT: credential.hasRoleNamesT(),
-                    },
+                    accessing: accessing.getDataT(),
+                    credential: credential.getDataT(),
                 },
             };
             s.AuditReport.toReport(credential, auditCause).save();

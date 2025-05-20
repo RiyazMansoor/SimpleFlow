@@ -1,6 +1,7 @@
 
 import { OceanFlow as t } from "./types";
 import { OceanFlow as b } from "./basics";
+import { OceanFlow as d } from "./design";
 import { OceanFlow as db } from "./store";
 
 
@@ -10,7 +11,7 @@ export namespace OceanFlow {
     /**
      * Security roles for access to parts of the different work-flows.
      */
-    export class Role extends b.SavableEntity<t.NameT, t.RoleT> {
+    export class Role extends b.SavableEntity {
 
         static fsdb: any = db.dbRoles;
 
@@ -20,11 +21,11 @@ export namespace OceanFlow {
          */
         constructor(roleT: t.AtLeastRoleT) {
             const dataT: t.RoleT = {
-                [t.RolePK]: roleT[t.RolePK],
+                [t.RoleSK]: roleT[t.RoleSK],
                 descriptionT: roleT.descriptionT,
                 enabled: roleT.enabled ?? true,
             };
-            super(t.RolePK, dataT, Role.fsdb);
+            super(t.RoleSK, dataT, Role.fsdb);
         }
 
         /**
@@ -78,10 +79,10 @@ export namespace OceanFlow {
          */
         constructor(loginT: t.AtLeastLoginT) {
             const dataT: t.LoginT = {
-                [t.LoginPK]: loginT[t.LoginPK],
+                [t.LoginSK]: loginT[t.LoginSK],
                 passwordT: loginT.passwordT,
             };
-            super(t.LoginPK, dataT, Login.fsdb);
+            super(t.LoginSK, dataT, Login.fsdb);
         }
 
         /**
@@ -98,7 +99,7 @@ export namespace OceanFlow {
          * @returns this Login object for chaining
          */
         setPassword(passwordT: t.PasswordT): Login {
-            this.getDataT().passwordT = passwordT;
+            this.dataT.passwordT = passwordT;
             return this;
         }
 
@@ -108,7 +109,7 @@ export namespace OceanFlow {
          * @returns true if password is correct
          */
         match(password: t.PasswordT): boolean {
-            return this.getDataT().passwordT == password;
+            return this.dataT.passwordT == password;
         }
 
     }
@@ -117,7 +118,9 @@ export namespace OceanFlow {
     /**
      * A users credential to accessing parts of this application
      */
-    export class Credential extends b.SavableEntity<t.EmailT, t.CredentialT> {
+    export class Securable 
+        extends b.SavableEntity<t.EmailT, t.CredentialT> 
+        implements d.Securable<t.EmailT, t.CredentialT> {
 
         static fsdb: any = db.dbCredentials;
 
@@ -127,13 +130,13 @@ export namespace OceanFlow {
          */
         constructor(credentialT: t.AtLeastCredentialT) {
             const dataT: t.CredentialT = {
-                [t.LoginPK]: credentialT[t.LoginPK],
+                [t.LoginSK]: credentialT[t.LoginSK],
                 userNameT: credentialT.userNameT,
                 [t.RoleNamesProperty]: credentialT[t.RoleNamesProperty] ?? [],
                 enabled: credentialT.enabled ?? true,
                 updatedT: credentialT.updatedT ?? [],
             };
-            super(t.LoginPK, dataT, Credential.fsdb);
+            super(t.LoginSK, dataT, Securable.fsdb);
         }
 
         /**
@@ -141,15 +144,19 @@ export namespace OceanFlow {
          * @loginEmailIdT the value of the primary key of the credential json data object
          * @returns the Credential object representing the json data object or undefined if not found
          */
-        static getInstance(loginEmailIdT: t.EmailT): Credential | undefined {
-            return super.loadInstance(Credential.fsdb, loginEmailIdT, Credential);
+        static getInstance(loginEmailIdT: t.EmailT): Securable | undefined {
+            return super.loadInstance(Securable.fsdb, loginEmailIdT, Securable);
+        }
+
+        getDataT(): t.CredentialT {
+            return this.dataT;
         }
 
         /**
          * @param roleNameIdT role to add to this credential
          * @returns returns this Credential for chaining
          */
-        addRole(roleNameIdT: t.NameT): Credential {
+        addRole(roleNameIdT: t.NameT): Securable {
             const index = this.dataT[t.RoleNamesProperty].indexOf(roleNameIdT);
             if (index < 0) {
                 this.dataT[t.RoleNamesProperty].push(roleNameIdT);
@@ -162,7 +169,7 @@ export namespace OceanFlow {
          * @param roleNameIdT role to remove to this credential
          * @returns returns this Credential for chaining
          */
-        removeRole(roleNameIdT: t.NameT): Credential {
+        removeRole(roleNameIdT: t.NameT): Securable {
             const index = this.dataT[t.RoleNamesProperty].indexOf(roleNameIdT);
             if (index >= 0) {
                 this.dataT[t.RoleNamesProperty].splice(index, 1);
@@ -172,22 +179,22 @@ export namespace OceanFlow {
         }
 
         hasRoles(): t.NameT[] {
-            return b.hasRoles(this);
+            return this.dataT[t.RoleNamesProperty];
         }
 
         /**
          * @returns true if this credential is enabled
          */
         isEnabled(): boolean {
-            return this.getDataT().enabled;
+            return this.dataT.enabled;
         }
 
         /**
          * @param status updated enabled status
          * @returns this object for chaining
          */
-        enable(status: boolean): Credential {
-            this.getDataT().enabled = status;
+        enable(status: boolean): Securable {
+            this.dataT.enabled = status;
             this.update();
             return this;
         }
@@ -202,7 +209,8 @@ export namespace OceanFlow {
     /**
      * Audit reports of happenings and serious issues that have to be followed up.
      */
-    export class AuditReport extends b.SavableEntity<t.InstanceIdT, t.AuditReportT> {
+    export class AuditReport 
+        extends b.SavableEntity<t.IdT, t.AuditReportT> {
 
         static fsdb: any = db.dbAuditReports;
 
@@ -233,7 +241,7 @@ export namespace OceanFlow {
          * @auditReportInstanceIdT the value of the primary key of the audit report json data object
          * @returns the AuditReport object representing the json data object or undefined if not found
          */
-        static getInstance(auditReportInstanceIdT: t.InstanceIdT): AuditReport | undefined {
+        static getInstance(auditReportInstanceIdT: t.IdT): AuditReport | undefined {
             return super.loadInstance(AuditReport.fsdb, auditReportInstanceIdT, AuditReport);
         }
 
@@ -244,7 +252,7 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         addCauses(...auditCausesT: t.AuditCauseT[]): AuditReport {
-            this.getDataT().auditCausesT.push(...auditCausesT);
+            this.dataT.auditCausesT.push(...auditCausesT);
             return this;
         }
 
@@ -255,7 +263,7 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         addReveiw(auditReveiwT: t.AuditReviewT): AuditReport {
-            this.getDataT().auditReviewsT.push(auditReveiwT);
+            this.dataT.auditReviewsT.push(auditReveiwT);
             return this;
         }
 
@@ -263,7 +271,7 @@ export namespace OceanFlow {
          * @returns true if this AuditReport is closed
          */
         isClosed(): boolean {
-            return this.getDataT().closed;
+            return this.dataT.closed;
         }
 
         /**
@@ -271,7 +279,7 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         close(): AuditReport {
-            this.getDataT().closed = true;
+            this.dataT.closed = true;
             this.freeze(this.isClosed());
             return this;
         }
@@ -293,7 +301,7 @@ export namespace OceanFlow {
             return reviewT;
         }
 
-        static toReport(credential: Credential, ...auditCausesT: t.AuditCauseT[]): AuditReport {
+        static toReport(credential: d.Securable<t.EmailT, t.CredentialT>, ...auditCausesT: t.AuditCauseT[]): AuditReport {
             return new AuditReport({ credentialT: credential.getDataT() }).addCauses(...auditCausesT);
         }
 

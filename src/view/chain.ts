@@ -116,7 +116,7 @@ export namespace OceanFlow {
             switch (nodeT.nodeTypeE) {
                 case t.NodeTypeE.FORM:
                     break;
-                case t.NodeTypeE.JOB:
+                case t.NodeTypeE.TASK:
                     break;
                 default:
                 // error

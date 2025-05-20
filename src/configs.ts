@@ -5,104 +5,63 @@ import { OceanFlow as d } from "./design";
 import { OceanFlow as c } from "./configs";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as i } from "./instances";
+import { data } from "jquery";
 // import { OceanFlow as v } from "./validations";
 
 export namespace OceanFlow {
 
 
     /**
-     * The work-flow configuration tht contains all sub configurations.
-     */
-    export class FlowConfig extends b.Entity<t.NameT, t.FlowConfigT> implements d.FlowConfig {
-
-
-        private dataConfigs = new b.EntityMap<t.DataConfigT, DataConfig>();
-        private htmlConfigs = new b.EntityMap<t.HTMLConfigT, HTMLConfig>();
-        private nodeConfigs = new b.EntityMap<t.NodeConfigT, NodeConfig<t.NodeConfigT>>();
-
-
-        constructor(flowConfigT: t.FlowConfigT) {
-            super(t.FlowConfigPK, flowConfigT);
-            this.dataConfigs.setAll(...flowConfigT.dataConfigsT.map(dataConfigT => new DataConfig(dataConfigT, this)));
-            this.htmlConfigs.setAll(...flowConfigT.htmlConfigsT.map(htmlConfigT => new HTMLConfig(htmlConfigT, this)));
-            this.nodeConfigs.setAll(...flowConfigT.formConfigsT.map(formConfigT => new FormConfig(formConfigT, this)));
-            this.nodeConfigs.setAll(...flowConfigT.taskConfigsT.map(taskConfigT => new TaskConfig(taskConfigT, this)));
-        }
-
-        start(): t.ResponseT {
-            const formNameT: t.NameT = this.dataT.startFormNameT;
-            const nodeConfig = this.nodeConfigs.get(formNameT);
-            const formConfig = nodeConfig as FormConfig;
-            return formConfig.formResponse();
-        }
-
-        dataConfig(dataNameIdT: t.NameT): c.DataConfig {
-            return this.dataConfigs.get(dataNameIdT);
-        }
-
-        htmlConfig(htmlNameIdT: t.NameT): c.HTMLConfig {
-            return this.htmlConfigs.get(htmlNameIdT);
-        }
-
-        nodeConfig(nodeNameIdT: t.NameT): c.NodeConfig<t.NodeConfigT> {
-            return this.nodeConfigs.get(nodeNameIdT);
-        }
-
-    }
-
-
-
-    /**
      * The work flow data configuration object.
      */
-    export class DataConfig extends b.ConfigBase<t.DataConfigT> {
+    // export class DataConfig extends b.ConfigBase<t.DataConfigT> {
 
-        /**
-         * @param configT the json data object
-         * @param flowConfig the parent flow configuration object
-         */
-        constructor(dataConfigT: t.DataConfigT, flowConfig: FlowConfig) {
-            super(t.DataConfigPK, dataConfigT, flowConfig);
-        }
+    //     /**
+    //      * @param configT the json data object
+    //      * @param flowConfig the parent flow configuration object
+    //      */
+    //     constructor(dataConfigT: t.DataConfigT, flowConfig: FlowConfig) {
+    //         super(t.DataConfigPK, dataConfigT, flowConfig);
+    //     }
 
-        /**
-         * This validation happens before flow instance is updated.
-         * @param dataInstanceT data instance to validate
-         * @returns array of causes if not validated or empty array
-         */
-        validate(dataInstanceT: t.DataInstanceT): t.AuditCauseT[] {
-            // return v.validateData(this.getDataT(), dataInstanceT);
-            return [];
-        }
+    //     /**
+    //      * This validation happens before flow instance is updated.
+    //      * @param dataInstanceT data instance to validate
+    //      * @returns array of causes if not validated or empty array
+    //      */
+    //     validate(dataInstanceT: t.DataInstanceT): t.AuditCauseT[] {
+    //         // return v.validateData(this.getDataT(), dataInstanceT);
+    //         return [];
+    //     }
 
-    }
+    // }
 
     /**
      * Rendering controls for this work flow forms
      */
-    export class HTMLConfig extends b.ConfigBase<t.HTMLConfigT> {
+    // export class HTMLConfig extends b.ConfigBase<t.HTMLConfigT> {
 
-        /**
-         * @param configT the json data object
-         * @param flowConfig the parent flow configuration object
-         */
-        constructor(htmlConfigT: t.HTMLConfigT, flowConfig: FlowConfig) {
-            super(t.HTMLConfigPK, htmlConfigT, flowConfig);
-        }
+    // /**
+    //  * @param configT the json data object
+    //  * @param flowConfig the parent flow configuration object
+    //  */
+    // constructor(htmlConfigT: t.HTMLConfigT, flowConfig: FlowConfig) {
+    //     super(t.HTMLConfigPK, htmlConfigT, flowConfig);
+    // }
 
-        dataNamesT(): t.NameT[] {
-            const dataNamesT: t.NameT[] = [];
-            if (this.dataT.component) {
-                dataNamesT.push(...this.dataT.component.dataNamesT);
-            } else if (this.dataT.custom) {
-                dataNamesT.push(this.dataT.custom.dataNameT);
-            } else {
-                // by default - its new line 
-            };
-            return dataNamesT;
-        }
+    // dataNamesT(): t.NameT[] {
+    //     const dataNamesT: t.NameT[] = [];
+    //     if (this.dataT.component) {
+    //         dataNamesT.push(...this.dataT.component.dataNamesT);
+    //     } else if (this.dataT.custom) {
+    //         dataNamesT.push(this.dataT.custom.dataNameT);
+    //     } else {
+    //         // by default - its new line 
+    //     };
+    //     return dataNamesT;
+    // }
 
-    }
+    // }
 
 
     /**
@@ -125,55 +84,66 @@ export namespace OceanFlow {
             this.flowConfig = flowConfig;
         }
 
+        getDataT(): ConfigT {
+            return this.dataT;
+        }
+
         type(): t.NodeTypeE {
             return this.dataT.nodeTypeE;
         }
 
         hasRoles(): t.NameT[] {
-            return b.hasRoles(this);
+            return this.dataT[t.RoleNamesProperty];
         }
 
-        hasRolesAccess(credential: s.Credential): t.AuditCauseT[] {
+        hasRolesAccess(credential: d.Securable<t.EmailT, t.CredentialT>): t.AuditCauseT[] {
             return b.hasAccess(this, credential);
         }
 
-        canProceed(): boolean {
+        spawnNodes(flowInstance: i.FlowInstance): void {
+            this.nextNodes(flowInstance, this.dataT.nextNodeNameIdsT);
+        }
+
+        private nextNodes(flowInstance: i.FlowInstance, nodeNameIdst: t.NameT[]): void {
+            for (const nodeNameT of nodeNameIdst) {
+                // node names are checked at startup diagnostics
+                const nodeConfig = this.flowConfig.nodeConfig(nodeNameT);
+                if (!nodeConfig.canProceed(flowInstance)) {
+                    // predicate failed - means this branch execution stops here
+                    // TODO: log this ?
+                    continue;
+                };
+                switch (nodeConfig.type()) {
+                    case t.NodeTypeE.FORM:
+                        const formInstanceT: t.AtLeastFormInstanceT = {
+                            [t.NodeConfigPK]: nodeConfig.getIdT(),
+                            [t.FlowInstancePK]: flowInstance.getIdT(),
+                        };
+                        const formInstance: i.FormInstance = new i.FormInstance(formInstanceT);
+                        formInstance.save();
+                        break;
+                    case t.NodeTypeE.TASK:
+                        const taskInstanceT: t.AtLeastTaskInstanceT = {
+                            [t.NodeConfigPK]: nodeConfig.getIdT(),
+                            [t.FlowInstancePK]: flowInstance.getIdT(),
+                        };
+                        const taskInstance: i.TaskInstance = new i.TaskInstance(taskInstanceT);
+                        taskInstance.save();
+                        taskInstance.taskUpload();
+                        if (taskInstance.isClosed()) {
+                            taskInstance.getConfig().spawnNodes(flowInstance);
+                        };
+                        break;
+                    default:
+                    // error
+                };
+            };
+        }
+
+        private canProceed(flowInstance: i.FlowInstance): boolean {
             // TODO check predicate with data from flowconfig
             return true;
         }
-
-        next(): t.NameT[] {
-            throw new Error("Method not implemented.");
-        }
-
-
-        // nextSteps(flowInstance: i.FlowInstance): void {
-        //     for (const nodeNameT of this.getDataT().nextNodesT) {
-        //         const config = this.flowConfig.getJobConfig(nodeNameT) ?? this.flowConfig.getJobConfig(nodeNameT);
-        //         if (!config.assertPredicate()) {
-        //             // predicate failed - means this branch execution stops here
-        //             continue;
-        //         };
-        //         switch (config.getDataT().nodeTypeE) {
-        //             case t.NodeTypeE.FORM:
-        //                 const formInstanceT: t.AtLeastFormInstanceT = {
-        //                     [t.NodeConfigPK]: config.getIdT(),
-        //                     [t.FlowInstancePK]: flowInstance.getIdT(),
-        //                 };
-        //                 const formInstance: n.FormInstance = new FormInstance(formInstanceT);
-        //                 formInstance.save();
-        //                 break;
-        //             case t.NodeTypeE.JOB:
-        //                 const jobInstanceT: t.AtLeastJobInstanceT = {
-        //                     [t.NodeConfigPK]: config.getIdT(),
-        //                     [t.FlowInstancePK]: flowInstance.getIdT(),
-        //                 }
-        //                 break;
-        //             default:
-        //             // error
-        //         };
-        //     };
-        // }
 
     }
 
@@ -195,7 +165,7 @@ export namespace OceanFlow {
             super(taskConfigT, flowConfig);
         }
 
-        dataMap(): t.DataConfigMapT {
+        dataMap(): t.DataPropertiesMapT {
             return this.dataT.dataMapT;
         }
 
@@ -210,6 +180,8 @@ export namespace OceanFlow {
         extends NodeConfig<t.FormConfigT>
         implements d.FormConfig {
 
+        // instance of the start form for kick starting the work-flow
+        // private readonly formInstance: i.FormInstance
 
         // pre-cached response of the form structure
         private readonly formResponseT: t.ResponseT;
@@ -229,41 +201,48 @@ export namespace OceanFlow {
             const flowDataNamesT: t.NameT[] = [];
             for (const formSegmentT of formConfigT.formSegmentsT) {
                 for (const formComponentT of formSegmentT.formCompnentsT) {
-                    const htmlConfigNameT = formComponentT[t.HTMLConfigPK];
+                    const htmlConfigNameT = formComponentT[t.FormWidgetPK];
                     allHTMLNamesT.push(htmlConfigNameT);
-                    const dataNamesT: t.NameT[] = flowConfig.htmlConfig(htmlConfigNameT).dataNamesT();
+                    const htmlConfigT: t.FormWidgetT = flowConfig.htmlConfigT(htmlConfigNameT);
+                    const dataNamesT: t.NameT[] = htmlConfigT.component?.dataNamesT ?? [];
+                    if (htmlConfigT.custom?.dataNameT) {
+                        dataNamesT.push(htmlConfigT.custom.dataNameT);
+                    };
                     allDataNamesT.push(...dataNamesT);
                     if (formComponentT.isFlowData) {
                         flowDataNamesT.push(...dataNamesT);
                     };
                 };
             };
+            // prepare the form response
             const responseT: t.ResponseT = {
                 form: {
                     formTitleT: formConfigT.titleT,
                     formSegmentsT: formConfigT.formSegmentsT,
-                    dataConfigsT: allDataNamesT.map(dataNameT => flowConfig.dataConfig(dataNameT).getDataT()),
-                    htmlConfigsT: allHTMLNamesT.map(htmlNameT => flowConfig.htmlConfig(htmlNameT).getDataT()),
-                    dataInstancesT: []
+                    dataPropertiesT: allDataNamesT.map(dataNameT => flowConfig.dataConfigT(dataNameT)),
+                    htmlConfigsT: allHTMLNamesT.map(htmlNameT => flowConfig.htmlConfigT(htmlNameT)),
+                    dataValuesT: []
                 },
             };
             this.formResponseT = responseT;
             this.flowDataNamesT = flowDataNamesT;
+            // const atLeastFormInstanceT: t.AtLeastFormInstanceT = {
+            //     [t.NodeConfigPK]: formConfigT[t.NodeConfigPK],
+            //     // note the following is worng - but the flow instance is not needed in this case
+            //     [t.FlowInstancePK]: flowConfig.getIdT(),    
+            // };
+            // this.formInstance = new i.FormInstance(atLeastFormInstanceT);
         }
 
-        hasUserAccess(credential: s.Credential): t.AuditCauseT[] {
-            throw new Error("Method not implemented.");
+        form(): t.ResponseT {
+            return this.formResponseT;
         }
 
-        formResponse(): t.ResponseT {
-            return { ...this.formResponseT };
+        filter(dataValuesT: t.DataValueT[]): t.DataValueT[] {
+            return dataValuesT.filter(dataValueT => this.flowDataNamesT.includes(dataValueT[t.DataPropertiesPK]));
         }
 
-        formDataInstances(dataInstancesT: t.DataInstanceT[]): t.DataInstanceT[] {
-            return dataInstancesT.filter(dataInstanceT => this.flowDataNamesT.includes(dataInstanceT[t.DataConfigPK]));
-        }
-
-        formValidate(dataInstancesT: t.DataInstanceT[]): t.ResponseT {
+        validate(dataInstancesT: t.DataValueT[]): t.AuditCauseT[] {
             throw new Error("Method not implemented.");
         }
 
@@ -289,5 +268,204 @@ export namespace OceanFlow {
 
     }
 
+    /**
+     * The work-flow configuration tht contains all sub configurations.
+     */
+    export class FlowConfig
+        extends b.Entity<t.NameT, t.FlowConfigT>
+        implements d.FlowConfig {
+
+
+        private dataConfigsT = new Map<t.NameT, t.DataPropertiesT>();
+        private htmlConfigsT = new Map<t.NameT, t.FormWidgetT>();
+
+        private nodeConfigs = new b.EntityMap<t.NodeConfigT, NodeConfig<t.NodeConfigT>>();
+
+
+        constructor(flowConfigT: t.FlowConfigT) {
+            super(t.FlowConfigPK, flowConfigT);
+            flowConfigT.dataConfigsT.forEach(dataConfigT => this.dataConfigsT.set(dataConfigT[t.DataPropertiesPK], dataConfigT));
+            flowConfigT.formWidgetsT.forEach(htmlConfigT => this.htmlConfigsT.set(htmlConfigT[t.FormWidgetPK], htmlConfigT));
+            this.nodeConfigs.setAll(...flowConfigT.formConfigsT.map(formConfigT => new FormConfig(formConfigT, this)));
+            this.nodeConfigs.setAll(...flowConfigT.taskConfigsT.map(taskConfigT => new TaskConfig(taskConfigT, this)));
+        }
+
+        static createInstance(flowNameIdt: t.NameT): i.FlowInstance {
+            const atLeastFlowInstanceT: t.AtLeastFlowInstanceT = {
+                [t.FlowConfigPK]: flowNameIdt,
+            };
+            return new i.FlowInstance(atLeastFlowInstanceT);
+        }
+
+        dataConfigT(dataNameIdT: t.NameT): t.DataPropertiesT {
+            return this.dataConfigsT.get(dataNameIdT);
+        }
+
+        htmlConfigT(htmlNameIdT: t.NameT): t.FormWidgetT {
+            return this.htmlConfigsT.get(htmlNameIdT);
+        }
+
+        nodeConfig(nodeNameIdT: t.NameT): c.NodeConfig<t.NodeConfigT> {
+            return this.nodeConfigs.get(nodeNameIdT);
+        }
+
+        startFetch(credential: s.Securable): t.ResponseT {
+            const formNameT: t.NameT = this.dataT.startFormNameT;
+            // startup diagnostics will verify this -> hence no errors
+            const formConfig = this.nodeConfig(formNameT) as FormConfig;
+            // role access check - user access no required
+            const auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            return formConfig.form();
+        }
+
+        startSubmit(credential: s.Securable, dataValuesT: t.DataValueT[]): t.ResponseT {
+            const formNameT: t.NameT = this.dataT.startFormNameT;
+            // startup diagnostics will verify this -> hence no errors
+            const formConfig = this.nodeConfig(formNameT) as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // filter the relevatn data values
+            dataValuesT = formConfig.filter(dataValuesT);
+            // validate the data values
+            auditCauses = formConfig.validate(dataValuesT);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // create work flow instance
+            const flowInstance = FlowConfig.createInstance(this.getIdT());
+            auditCauses = flowInstance.addData(dataValuesT);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            flowInstance.save();
+            // TODO: spawn next nodes
+            formConfig.spawnNodes(flowInstance);
+            // return empty response for success
+            return {};
+        }
+
+        formPicked(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+            // fetch the form instance
+            const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
+            if (!formInstance) {
+                return this.invalidFormName(nodeInstanceIdt);
+            };
+            const formConfig = formInstance.getConfig() as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            auditCauses = formInstance.hasUserAccess(credential);
+            if (auditCauses.length >= 0) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // access validated -> proceed to business logic
+            return formInstance.formPicked(credential);
+        }
+
+        formRequested(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+            // fetch the form instance
+            const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
+            if (!formInstance) {
+                return this.invalidFormName(nodeInstanceIdt);
+            };
+            const formConfig = formInstance.getConfig() as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            auditCauses = formInstance.hasUserAccess(credential);
+            if (auditCauses.length >= 0) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // access validated -> proceed to business logic
+            return formInstance .formRequested();
+        }
+
+        formReturned(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+            // fetch the form instance
+            const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
+            if (!formInstance) {
+                return this.invalidFormName(nodeInstanceIdt);
+            };
+            const formConfig = formInstance.getConfig() as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            auditCauses = formInstance.hasUserAccess(credential);
+            if (auditCauses.length >= 0) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // access validated -> proceed to business logic
+            return formInstance .formReturned();
+        }
+
+        formSaved(credential: s.Securable, nodeInstanceIdt: t.IdT, dataValuesT: t.DataValueT[]): t.ResponseT {
+            // fetch the form instance
+            const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
+            if (!formInstance) {
+                return this.invalidFormName(nodeInstanceIdt);
+            };
+            const formConfig = formInstance.getConfig() as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            auditCauses = formInstance.hasUserAccess(credential);
+            if (auditCauses.length >= 0) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // access validated -> proceed to business logic
+            return formInstance .formSaved(dataValuesT);
+        }
+
+        formSubmitted(credential: s.Securable, nodeInstanceIdt: t.IdT, dataValuesT: t.DataValueT[]): t.ResponseT {
+            // fetch the form instance
+            const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
+            if (!formInstance) {
+                return this.invalidFormName(nodeInstanceIdt);
+            };
+            const formConfig = formInstance.getConfig() as FormConfig;
+            // role access check - user access no required
+            let auditCauses: t.AuditCauseT[] = formConfig.hasRolesAccess(credential);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            auditCauses = formInstance.hasUserAccess(credential);
+            if (auditCauses.length >= 0) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // filter the relevatn data values
+            dataValuesT = formConfig.filter(dataValuesT);
+            // validate the data values
+            auditCauses = formConfig.validate(dataValuesT);
+            if (auditCauses.length) {
+                return b.wrapResponse(...auditCauses);
+            };
+            // create work flow instance
+            return formInstance.formSubmitted(dataValuesT);
+        }
+
+        private invalidFormName(formInstanceIdT: t.NameT): t.ResponseT {
+            const auditCause: t.AuditCauseT = {
+                descriptionT: `invalid form-name [${formInstanceIdT}]`,
+                payloadT: {}
+            };
+            return b.wrapResponse(auditCause);
+        }
+
+
+    }
 
 }

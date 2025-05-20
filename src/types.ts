@@ -17,26 +17,26 @@ export namespace OceanFlow {
     // The basic types used in the application
     export type IntegerT = number;
     export type DecimalT = number;
-    export type TLabel = string;
+    export type LabelT = string;
     export type NameT = string;
     export type DescriptionT = string;
-    export type THtml = string;
-    export type TNumeric = string;
-    export type TAlphatic = string;
-    export type TAlphaNumeric = string;
+    // export type THtml = string;
+    // export type TNumeric = string;
+    // export type TAlphatic = string;
+    // export type TAlphaNumeric = string;
     export type PasswordT = string;
     export type EmailT = string;
-    export type TPhone = string;
-    export type TNIN = string;
-    export type TDate = string;
-    export type TTime = string;
+    // export type TPhone = string;
+    // export type TNIN = string;
+    // export type TDate = string;
+    // export type TTime = string;
     export type TimestampT = string;
-    export type TPostcode = string;
+    // export type TPostcode = string;
     export type ExpressionT = string;
-    export type InstanceIdT = string;
+    export type IdT = string;
 
     export type TitleT = {
-        titleT: NameT,
+        titleT: LabelT,
         descriptionT: DescriptionT,
     };
 
@@ -47,68 +47,85 @@ export namespace OceanFlow {
     export type JSONArrayT = JSONValueT[];
     export type JSONValueT = JSONPrimitiveT | JSONObjectT | JSONArrayT;
 
+    // the base type for all data objects with a specific primary key field
+    // data objects may have a secondary key field ending in SKeyT
+    export type BaseT = {
+        PriKeyT: IdT,
+    };
 
     // a generic type to pick only certain properties as requried properties
     // type Sample = AtLeast<T, 'model' | 'rel'>
     export type AtLeast<T, K extends keyof T> = Partial<T> & Pick<T, K>
 
+    //// instance class signature
+    export type Constructor<Class, DataT> = new (dataT: DataT) => Class;
+
+
+    ////// some shared types
+
+    export const ClosedProperty = "closed";
+    export type CloseableT = {
+        [ClosedProperty]: boolean,
+    };
+
+    export const EnabledProperty = "enabled";
+    export type EnableableT = {
+        [EnabledProperty]: boolean,
+    };
+
+    // active roles an entity has
+    export const RoleNamesProperty = "roleNamesT";
+    export type SecurableT = {
+        [RoleNamesProperty]: NameT[],
+    };
+
 
     ////// security - roles, logins and credentials
 
     // roles that provide access to the system
-    export const RolePK = "roleNameIdT";
-    export type RoleT = {
-        [RolePK]: NameT,                       // primary key
+    export const RoleSK = "roleNameSecKeyT";
+    export type RoleT = BaseT & EnableableT & {
+        [RoleSK]: NameT, 
         descriptionT: DescriptionT,
-        enabled: boolean,
     };
-    export type AtLeastRoleT = AtLeast<RoleT, typeof RolePK | "descriptionT">
+    export type AtLeastRoleT = AtLeast<RoleT, typeof RoleSK | "descriptionT">
 
-    // user login access
-    export const LoginPK = "loginEmailIdT";
-    export type LoginT = {
-        [LoginPK]: EmailT,                     // primary key
-        passwordT: PasswordT,               // stored in hashed form
+    // user login access - passwords must be hashed securely
+    export const LoginSK = "loginEmailSecKeyT";
+    export type LoginT = BaseT & {
+        [LoginSK]: EmailT, 
+        passwordT: PasswordT,
     };
-    export type AtLeastLoginT = AtLeast<LoginT, typeof LoginPK | "passwordT">;
+    export type AtLeastLoginT = AtLeast<LoginT, typeof LoginSK | "passwordT">;
 
-    // active roles a user has
-    export const RoleNamesProperty = "roleNamesT";
-    export type SecureRoleT = {
-        [RoleNamesProperty]: NameT[],             // from TRole
-    };
 
-    export type CredentialT = SecureRoleT & {
-        [LoginPK]: NameT,                       // from TUser
-        userNameT: NameT,                  // from TUser
-        enabled: boolean,
-        updatedT: TimestampT[],             // list of last updated timestamps
+    export type CredentialT = BaseT & EnableableT & SecurableT & {
+        [LoginSK]: NameT,                       // from TUser
+        userNameT: NameT,
+        updatedT: TimestampT[],                 // list of last updated timestamps
     };
-    export type AtLeastCredentialT = AtLeast<CredentialT, typeof LoginPK | "userNameT">
+    export type AtLeastCredentialT = AtLeast<CredentialT, typeof LoginSK | "userNameT">
 
     // this credential is used for public available services
     export const PublicCredentialT: CredentialT = {
-        [LoginPK]: "public@flow.com",
+        [LoginSK]: "public@flow.com",
         userNameT: "Public User",
         [RoleNamesProperty]: ["public"],
-        enabled: true,
+        [EnabledProperty]: true,
         updatedT: [],
     };
     Object.freeze(PublicCredentialT);
 
     // this credential is used for system internal services
     export const SystemCredentialT: CredentialT = {
-        [LoginPK]: "system@flow.com",
+        [LoginSK]: "system@flow.com",
         userNameT: "System User",
         [RoleNamesProperty]: ["system"],
-        enabled: true,
+        [EnabledProperty]: true,
         updatedT: [],
     };
     Object.freeze(SystemCredentialT);
 
-
-    //// instance class signature
-    export type Constructor<Class, DataT> = new (dataT: DataT) => Class;
 
     ////// system audit management => includes logs and errors
 
@@ -136,15 +153,14 @@ export namespace OceanFlow {
     // one or more  related causes
     // one or more staff reviews and closure
     export const AuditReportPK = "auditReportInstanceIdT";
-    export type AuditReportT = {
+    export type AuditReportT = CloseableT & {
         timestampedT: TimestampT,
-        [AuditReportPK]: InstanceIdT,
+        [AuditReportPK]: IdT,
         auditTypeE: AuditTypeE,
         credentialT: CredentialT,
         stack: DescriptionT,
         auditCausesT: AuditCauseT[],
         auditReviewsT: AuditReviewT[],
-        closed: boolean,
     };
     export type AtLeastAuditReportT = AtLeast<AuditReportT, "credentialT">;
 
@@ -180,17 +196,17 @@ export namespace OceanFlow {
     //// configuration of data items in the flow
     //// name is used as an unique identifier in flow
     //// data validations are specified here
-    export const DataConfigPK = "dataNameIdT";
-    export type DataConfigT = {
-        [DataConfigPK]: NameT,
+    export const DataPropertiesPK = "dataNameIdT";
+    export type DataPropertiesT = {
+        [DataPropertiesPK]: NameT,
         dataTypeE: DataTypeE,
         validations?: ValidationT,          // validations can be optional
     };
 
     //// a user data entry - used throughout this application
     //// name must match respective data-config
-    export type DataInstanceT = {
-        [DataConfigPK]: NameT,
+    export type DataValueT = {
+        [DataPropertiesPK]: NameT,
         dataValue: string | number | boolean,
     };
 
@@ -199,28 +215,27 @@ export namespace OceanFlow {
 
     // there could be many types of nodes
     export enum NodeTypeE {
-        FORM,
-        JOB,
+        FORM,                                   // a form node - user input
+        TASK,                                   // a task node - system work
     };
 
     // a node configuration on the flow graph
     export const NodeConfigPK = "nodeNameIdT";
-    export type NodeConfigT = {
-        [NodeConfigPK]: NameT,              // name of node - eg: form-name or job-name
-        [FlowConfigPK]: NameT,
-        nodeTypeE: NodeTypeE,               // type of node
-        predExpressionT: ExpressionT,       // boolean expression to proceed or not    
-        roleNamesT: NameT[],                // authorised roles for this node
-        nextNodesT: NameT[],          // multpe nodes may follow
+    export type NodeConfigT = SecurableT & {
+        [NodeConfigPK]: NameT,                  // name of node - eg: form-name or job-name
+        [FlowConfigPK]: NameT,                  // name of flow-config that spawned this node
+        nodeTypeE: NodeTypeE,                   // type of node
+        predExpressionT: ExpressionT,           // boolean expression to proceed or not    
+        nextNodeNameIdsT: NameT[],                    // multpe nodes may follow
     };
 
 
-    export type DataConfigMapT = {
-        [taskDataNameT: NameT]: NameT,
+    export type DataPropertiesMapT = {
+        [dataNameT: NameT]: NameT,
     };
 
-    export type DataInstanceMapT = {
-        [taskDataNameT: NameT]: DataInstanceT,
+    export type DataValuesMapT = {
+        [dataNameT: NameT]: DataValueT,
     };
 
     //// a specific node type - system work/job 
@@ -228,7 +243,7 @@ export namespace OceanFlow {
         // this is map to  extract the data values from the flow
         // every data name required by the work/job => mapped to the data name of the flow
         taskFunction: "",
-        dataMapT: DataConfigMapT,
+        dataMapT: DataPropertiesMapT,
     };
 
 
@@ -258,12 +273,11 @@ export namespace OceanFlow {
     };
 
     //// rendering of a control or component
-    //// the configuration will contain one of three (paragraph, component, custom) 
-    export const HTMLConfigPK = "htmlNameIdT";
-    export type HTMLConfigT = {
-        [HTMLConfigPK]: NameT,
-        // force a new line widget
-        paragraph?: boolean,
+    //// the configuration will contain one of (component, custom) or neither.
+    //// where it is neither, the component renders a newline 
+    export const FormWidgetPK = "widgetNameIdT";
+    export type FormWidgetT = {
+        [FormWidgetPK]: NameT,
         // pre built component with multiple widgets that can map multiple fields
         component?: {
             componentNameT: NameT,          // name of the pre-built component
@@ -279,16 +293,10 @@ export namespace OceanFlow {
             list?: [NameT, string][],
         },
     };
-    //// a constant ctrl for new line/para during rendering
-    export const ParagraphHTMLConfigT: HTMLConfigT = {
-        [HTMLConfigPK]: "paragraph",
-        paragraph: true,
-    };
 
     //// how a ctrl will be rendered
-    export type FormComponentT = {
-        [HTMLConfigPK]: NameT,
-        enabled: boolean,                   // control is enabled, else disabled
+    export type FormComponentT = EnableableT & {
+        [FormWidgetPK]: NameT,
         isFlowData: boolean,                // data that will be uploaded flow data
     };
 
@@ -304,20 +312,13 @@ export namespace OceanFlow {
         formSegmentsT: FormSegmentT[],
     };
 
-    export type FormRenderingT = {
-        titleT: TitleT,
-        segmentsT: FormSegmentT[],
-        hmtlConfigNamesT: NameT[],
-        dataConfigNamesT: NameT[],
-    };
-
 
     //// node-instance is an "abstract" type.
     //// extension like job/form have the implementation
     export const NodeInstancePK = "nodeInstanceIdT";
     export type NodeInstanceT = {
         timestampedT: TimestampT,
-        [NodeInstancePK]: InstanceIdT,
+        [NodeInstancePK]: IdT,
         [NodeConfigPK]: NameT,
         [FlowInstancePK]: NameT,
     };
@@ -328,11 +329,11 @@ export namespace OceanFlow {
         OPEN,           // job has been created - an active state
         CLOSED,         // job has been completed and closed normally
         SKIPPED,        // a human intervention - skips the job and moves next
-    }
+    };
 
     export type TaskAttemptT = AuditCauseT & {
         timestampedT: TimestampT,
-    }
+    };
 
     export type TaskInstanceT = NodeInstanceT & {
         attemptsT: TaskAttemptT[],           // users access form
@@ -349,7 +350,7 @@ export namespace OceanFlow {
         RETURNED,       // task returned to queue - this is an end state - HUMAN task only
         EXECUTED,       // task executed - this is an end state
         ABORTED,        // task aborted - by a supervisor/admin - this is an end state
-    }
+    };
 
     //// record for form accesses
     export type FormAccessT = {
@@ -360,14 +361,14 @@ export namespace OceanFlow {
         returnedTimestampT?: TimestampT,
         executedTimestampT?: TimestampT,
         abortedTimestampT?: TimestampT,
-    }
+    };
 
     // 
     export type FormInstanceT = NodeInstanceT & {
-        accessesT: FormAccessT[],           // users access form
+        accessesT: FormAccessT[],               // users access form
         statusE: FormStatusE,
-        currentUserEmailT: EmailT,          // easy access to last user (db filtering)
-        tempDataItemsT: DataInstanceT[],        // when user saves form for later
+        currentUserEmailT: EmailT,              // easy access to last user (db filtering)
+        tempDataItemsT: DataValueT[],           // when user saves form for later
     };
     export type AtLeastFormInstanceT = AtLeast<FormInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
 
@@ -377,36 +378,36 @@ export namespace OceanFlow {
     //// configuration settings for a flow type
     export const FlowConfigPK = "flowNameIdT";
     export type FlowConfigT = {
-        [FlowConfigPK]: NameT,              // flow name
+        [FlowConfigPK]: NameT,                  // flow name
         startFormNameT: NameT,                  // kick start data input as contained in form
-        dataConfigsT: DataConfigT[],        // every data item has its own data/validation
-        htmlConfigsT: HTMLConfigT[],        // 
-        formConfigsT: FormConfigT[],        // all the forms in this flow
-        taskConfigsT: TaskConfigT[],        // all the form widgets in this flow
+        dataConfigsT: DataPropertiesT[],        // every data item has its own data/validation
+        taskConfigsT: TaskConfigT[],            // all the form widgets in this flow
+        formConfigsT: FormConfigT[],            // all the forms in this flow
+        formWidgetsT: FormWidgetT[],            // 
     };
 
     //// status of a flow instance
     export enum FlowStatusE {
-        OPEN,                               // flow is active
-        CLOSED,                             // normal closing of flow
-        ABORTED,                            // flow (sub everything) can be aborted by a supervisor/admin
-    }
+        OPEN,                                   // flow is active
+        CLOSED,                                 // normal closing of flow
+        ABORTED,                                // flow (sub everything) can be aborted by a supervisor/admin
+    };
 
     //// activity and other notes occuring on a flow instance
     export type LogItemT = {
         timestamp: TimestampT,
         description: DescriptionT,
-        credential: CredentialT,            // who was active when log generated
-        form?: {                           // for form related logs
-            instanceId: InstanceIdT,        // for instance id
-            formData: DataInstanceT[],          // data received from a form
+        credential: CredentialT,                // who was active when log generated
+        form?: {
+            instanceId: IdT,
+            formData: DataValueT[],          // data received from a form
         },
-    }
+    };
 
     //// flow-instance spawned by respective flow-config
     export const FlowInstancePK = "flowInstanceIdT";
     export type FlowInstanceT = {
-        [FlowInstancePK]: InstanceIdT,
+        [FlowInstancePK]: IdT,
         [FlowConfigPK]: NameT,                        // form-config name that spawned this instance
         timestamps: {
             createdT: TimestampT,
@@ -414,10 +415,10 @@ export namespace OceanFlow {
             abortedT?: TimestampT,
         },
         logItemsT: LogItemT[],
-        dataItemsT: DataInstanceT[],
+        dataItemsT: DataValueT[],
         statusE: FlowStatusE,
     };
-    export type AtLeastFlowInstance = AtLeast<FlowInstanceT, typeof FlowConfigPK>;
+    export type AtLeastFlowInstanceT = AtLeast<FlowInstanceT, typeof FlowConfigPK>;
 
 
     //// this part defines the execution pipeline for user service requests
@@ -430,42 +431,31 @@ export namespace OceanFlow {
         RETURN_FORM,
         SAVE_FORM,
         SUBMIT_FORM,
-    }
+    };
 
     //// context created for all work flow operations
     //// required objects are created here as required and the response as well
     export type ContextT = {
-        userEmail?: EmailT,                 // optional calling user, maybe a public user
-        // one of these two must be present
-        formInstanceId?: InstanceIdT,       // needed for task specific actions
-        flowName?: NameT,                   // needed for flow start actions
-
-        formName?: NameT,
-        dataItems?: DataInstanceT[],            // needed for all form submissions
-        credential?: Credential,            // created 
-        // flowConfig?: FlowConfig,            // created if needed 
-        // flowInstance?: FlowInstance,        // created if needed
-        // formInstance?: FormInstance,        // created if needed
-        response?: ResponseT,
-    }
-
-    //// pipeline executes sequence of functions of type Action
-    //// at each action conclusion, if the response contains an "error" => abort
-    export type Action = (context: ContextT) => void;
+        userEmailIdT?: EmailT,                    // optional calling user, maybe a public user
+        // when taking an action on a form
+        formInstanceIdT?: IdT,          // needed for task specific actions
+        formDataValuesT?: DataValueT[],         // values submitted for the user action
+        // when starting a work flow
+        flowNameIdT?: NameT,                      // needed for flow start actions
+    };
 
 
     ////// response object received by clients
+    // an empty response is a success
     export type ResponseT = {
-        error?: AuditCauseT[],              // if errors occurred
+        error?: AuditCauseT[],                  // if errors occurred
         form?: {
             formTitleT: TitleT,
-            formSegmentsT: FormSegmentT[],   // provides form structure and elements
-            htmlConfigsT: HTMLConfigT[],     // element structure to render
-            dataConfigsT: DataConfigT[],     // the forms data elements and data validation
-            dataInstancesT: DataInstanceT[], // forms data values if available
+            formSegmentsT: FormSegmentT[],      // provides form structure and elements
+            htmlConfigsT: FormWidgetT[],        // element structure to render
+            dataPropertiesT: DataPropertiesT[], // the forms data elements and data validation
+            dataValuesT: DataValueT[],          // forms data values if available
         },
-    }
-
-
+    };
 
 }
