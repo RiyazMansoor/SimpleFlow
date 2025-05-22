@@ -48,7 +48,7 @@ export namespace OceanFlow {
             super(t.NodeInstancePK, atLeastNodeInstanceT, fsdb);
             // these lines should never return null
             this.flowInstance = FlowInstance.getInstance(atLeastNodeInstanceT[t.FlowInstancePK])!;
-            this.nodeConfig = this.flowInstance.getConfig().nodeConfig(atLeastNodeInstanceT[t.NodeConfigPK]);
+            this.nodeConfig = this.flowInstance.getConfig().nodeConfig(atLeastNodeInstanceT[t.NodeConfigSK]);
         }
 
         getConfig(): d.NodeConfig<t.NodeConfigT> {
@@ -76,7 +76,7 @@ export namespace OceanFlow {
             const dataT: t.TaskInstanceT = {
                 timestampedT: atLeastTaskInstanceT.timestampedT ?? b.TimestampStr(),
                 [t.NodeInstancePK]: atLeastTaskInstanceT[t.NodeInstancePK] ?? b.RandomStr(),
-                [t.NodeConfigPK]: atLeastTaskInstanceT[t.NodeConfigPK],
+                [t.NodeConfigSK]: atLeastTaskInstanceT[t.NodeConfigSK],
                 [t.FlowInstancePK]: atLeastTaskInstanceT[t.FlowInstancePK],
                 attemptsT: atLeastTaskInstanceT.attemptsT ?? [],
                 statusE: atLeastTaskInstanceT.statusE ?? t.TaskStatusE.OPEN,
@@ -90,7 +90,7 @@ export namespace OceanFlow {
          * @nodeInstanceIdT the value of the primary key of the TaskInstance json data object
          * @returns the TaskInstance object representing the json data object or undefined if not found
          */
-        static getInstance(nodeInstanceIdT: t.IdT): TaskInstance | undefined {
+        static getInstance(nodeInstanceIdT: t.InstanceIdT): TaskInstance | undefined {
             return super.loadInstance(nodeInstanceIdT, TaskInstance, TaskInstance.fsdb);
         }
 
@@ -125,7 +125,7 @@ export namespace OceanFlow {
             const dataT: t.FormInstanceT = {
                 timestampedT: formInstanceT.timestampedT ?? b.TimestampStr(),
                 [t.NodeInstancePK]: formInstanceT[t.NodeInstancePK] ?? b.RandomStr(),
-                [t.NodeConfigPK]: formInstanceT[t.NodeConfigPK],
+                [t.NodeConfigSK]: formInstanceT[t.NodeConfigSK],
                 [t.FlowInstancePK]: formInstanceT[t.FlowInstancePK],
                 accessesT: formInstanceT.accessesT ?? [],
                 currentUserEmailT: formInstanceT.currentUserEmailT ?? "",
@@ -136,7 +136,7 @@ export namespace OceanFlow {
             this.freeze(this.isClosed())
         }
 
-        static getInstance(nodeInstanceIdT: t.IdT): FormInstance | undefined {
+        static getInstance(nodeInstanceIdT: t.InstanceIdT): FormInstance | undefined {
             return super.loadInstance(nodeInstanceIdT, FormInstance, FormInstance.fsdb);
         }
 
@@ -183,7 +183,7 @@ export namespace OceanFlow {
             this.update().save();
             const formResponse: t.ResponseT = this.getConfig().form();
             formResponse.form.dataValuesT = this.dataT.tempDataItemsT;
-            return 
+            return
         }
 
         formReturned(): t.ResponseT {
@@ -231,7 +231,7 @@ export namespace OceanFlow {
 
         private update(): FormInstance {
             this.dataT.accessesT = this.dataT.accessesT.slice(-10);
-            this.dataT.currentUserEmailT = this.dataT.accessesT.slice(-1)[0].credentialT[t.LoginSK];
+            this.dataT.currentUserEmailT = this.dataT.accessesT.slice(-1)[0].credentialT[t.LoginPK];
             return this;
         }
 
@@ -248,7 +248,7 @@ export namespace OceanFlow {
      * User generated flow instances as per its respective flow configuration.
      */
     export class FlowInstance
-        extends b.SavableEntity<t.IdT, t.FlowInstanceT>
+        extends b.SavableEntity<t.InstanceIdT, t.FlowInstanceT>
         implements d.FlowInstance {
 
         static fsdb = db.dbFlowInstances;
@@ -262,7 +262,7 @@ export namespace OceanFlow {
         constructor(flowInstanceT: t.AtLeastFlowInstanceT) {
             const dataT: t.FlowInstanceT = {
                 [t.FlowInstancePK]: flowInstanceT[t.FlowInstancePK] ?? b.RandomStr(),
-                [t.FlowConfigPK]: flowInstanceT[t.FlowConfigPK],
+                [t.FlowConfigSK]: flowInstanceT[t.FlowConfigSK],
                 logItemsT: flowInstanceT.logItemsT ?? [],
                 dataItemsT: flowInstanceT.dataItemsT ?? [],
                 statusE: flowInstanceT.statusE ?? t.FlowStatusE.OPEN,
@@ -272,7 +272,7 @@ export namespace OceanFlow {
             };
             super(t.FlowInstancePK, dataT, FlowInstance.fsdb);
             this.freeze(this.isClosed());
-            this.flowConfig = m.OceanFlowApp.getInstance().get(flowInstanceT[t.FlowConfigPK]);
+            this.flowConfig = m.OceanFlowApp.getInstance().get(flowInstanceT[t.FlowConfigSK]);
         }
 
         /**
@@ -280,7 +280,7 @@ export namespace OceanFlow {
          * @flowInstanceIdT the value of the primary key of the FlowInstance json data object
          * @returns the FlowInstance object representing the json data object or undefined if not found
          */
-        static getInstance(flowInstanceIdT: t.IdT): FlowInstance | undefined {
+        static getInstance(flowInstanceIdT: t.InstanceIdT): FlowInstance | undefined {
             return super.loadInstance(FlowInstance.fsdb, flowInstanceIdT, FlowInstance);
         }
 

@@ -33,10 +33,10 @@ export namespace OceanFlow {
     export type TimestampT = string;
     // export type TPostcode = string;
     export type ExpressionT = string;
-    export type IdT = string;
+    export type InstanceIdT = string;
 
     export type TitleT = {
-        titleT: LabelT,
+        labelT: LabelT,
         descriptionT: DescriptionT,
     };
 
@@ -47,11 +47,6 @@ export namespace OceanFlow {
     export type JSONArrayT = JSONValueT[];
     export type JSONValueT = JSONPrimitiveT | JSONObjectT | JSONArrayT;
 
-    // the base type for all data objects with a specific primary key field
-    // data objects may have a secondary key field ending in SKeyT
-    export type BaseT = {
-        PriKeyT: IdT,
-    };
 
     // a generic type to pick only certain properties as requried properties
     // type Sample = AtLeast<T, 'model' | 'rel'>
@@ -63,68 +58,87 @@ export namespace OceanFlow {
 
     ////// some shared types
 
-    export const ClosedProperty = "closed";
+    // the base type for all data objects with 
+    export type EntityT = {
+    };
+
+    // an entity that is closeable to further edits
+    export const PropClosed = "closed";
     export type CloseableT = {
-        [ClosedProperty]: boolean,
+        [PropClosed]: boolean,
     };
 
-    export const EnabledProperty = "enabled";
+    // an entity that can be enabled or disabled
+    export const PropEnabled = "enabled";
     export type EnableableT = {
-        [EnabledProperty]: boolean,
+        [PropEnabled]: boolean,
     };
 
-    // active roles an entity has
-    export const RoleNamesProperty = "roleNamesT";
+    // an entity that has security roles to access it
+    export const PropRoleNames = "roleNamesT";
     export type SecurableT = {
-        [RoleNamesProperty]: NameT[],
+        [PropRoleNames]: NameT[],
     };
 
+    // and entity that is saveable
+    export type SaveLog = {
+        note: DescriptionT,
+        saved: TimestampT,
+        login: EmailT,
+    };
+    export const PropSaved = "saved";
+    export type SaveableT = {
+        [PropSaved]: SaveLog[],
+    };
+
+    export type SecurableEntityT = EntityT & SecurableT;
 
     ////// security - roles, logins and credentials
 
     // roles that provide access to the system
-    export const RoleSK = "roleNameSecKeyT";
-    export type RoleT = BaseT & EnableableT & {
-        [RoleSK]: NameT, 
+    export const RolePK = "roleNameIdT";
+    export type RoleT = EntityT & EnableableT & {
+        [RolePK]: NameT,
         descriptionT: DescriptionT,
     };
-    export type AtLeastRoleT = AtLeast<RoleT, typeof RoleSK | "descriptionT">
+    export type AtLeastRoleT = AtLeast<RoleT, typeof RolePK | "descriptionT">
 
     // user login access - passwords must be hashed securely
-    export const LoginSK = "loginEmailSecKeyT";
-    export type LoginT = BaseT & {
-        [LoginSK]: EmailT, 
+    export const LoginPK = "loginEmailIdT";
+    export type LoginT = EntityT & {
+        [LoginPK]: EmailT,
         passwordT: PasswordT,
     };
-    export type AtLeastLoginT = AtLeast<LoginT, typeof LoginSK | "passwordT">;
+    export type AtLeastLoginT = AtLeast<LoginT, typeof LoginPK | "passwordT">;
 
-
-    export type CredentialT = BaseT & EnableableT & SecurableT & {
-        [LoginSK]: NameT,                       // from TUser
+    // user access credentials/roles to perform authorized functions
+    export type CredentialT = EntityT & EnableableT & SecurableT & {
+        [LoginPK]: NameT,
         userNameT: NameT,
         updatedT: TimestampT[],                 // list of last updated timestamps
     };
-    export type AtLeastCredentialT = AtLeast<CredentialT, typeof LoginSK | "userNameT">
+    export type AtLeastCredentialT = AtLeast<CredentialT, typeof LoginPK | "userNameT">
 
     // this credential is used for public available services
-    export const PublicCredentialT: CredentialT = {
-        [LoginSK]: "public@flow.com",
-        userNameT: "Public User",
-        [RoleNamesProperty]: ["public"],
-        [EnabledProperty]: true,
-        updatedT: [],
-    };
-    Object.freeze(PublicCredentialT);
+    // export const PublicCredentialT: CredentialT = {
+    //     [PriKeyT]: 
+    //     [LoginSK]: "public@flow.com",
+    //     userNameT: "Public User",
+    //     [RoleNamesProperty]: ["public"],
+    //     [EnabledProperty]: true,
+    //     updatedT: [],
+    // };
+    // Object.freeze(PublicCredentialT);
 
-    // this credential is used for system internal services
-    export const SystemCredentialT: CredentialT = {
-        [LoginSK]: "system@flow.com",
-        userNameT: "System User",
-        [RoleNamesProperty]: ["system"],
-        [EnabledProperty]: true,
-        updatedT: [],
-    };
-    Object.freeze(SystemCredentialT);
+    // // this credential is used for system internal services
+    // export const SystemCredentialT: CredentialT = {
+    //     [LoginSK]: "system@flow.com",
+    //     userNameT: "System User",
+    //     [RoleNamesProperty]: ["system"],
+    //     [EnabledProperty]: true,
+    //     updatedT: [],
+    // };
+    // Object.freeze(SystemCredentialT);
 
 
     ////// system audit management => includes logs and errors
@@ -153,14 +167,14 @@ export namespace OceanFlow {
     // one or more  related causes
     // one or more staff reviews and closure
     export const AuditReportPK = "auditReportInstanceIdT";
-    export type AuditReportT = CloseableT & {
+    export type AuditReportT = EntityT & CloseableT & {
         timestampedT: TimestampT,
-        [AuditReportPK]: IdT,
+        [AuditReportPK]: InstanceIdT,
         auditTypeE: AuditTypeE,
-        credentialT: CredentialT,
-        stack: DescriptionT,
         auditCausesT: AuditCauseT[],
         auditReviewsT: AuditReviewT[],
+        credentialT: CredentialT,
+        stack: DescriptionT,
     };
     export type AtLeastAuditReportT = AtLeast<AuditReportT, "credentialT">;
 
@@ -220,10 +234,10 @@ export namespace OceanFlow {
     };
 
     // a node configuration on the flow graph
-    export const NodeConfigPK = "nodeNameIdT";
-    export type NodeConfigT = SecurableT & {
-        [NodeConfigPK]: NameT,                  // name of node - eg: form-name or job-name
-        [FlowConfigPK]: NameT,                  // name of flow-config that spawned this node
+    export const NodeConfigSK = "nodeNameIdT";
+    export type NodeConfigT = EntityT & SecurableT & {
+        [NodeConfigSK]: NameT,                  // name of node - eg: form-name or job-name
+        [FlowConfigSK]: NameT,                  // name of flow-config that spawned this node
         nodeTypeE: NodeTypeE,                   // type of node
         predExpressionT: ExpressionT,           // boolean expression to proceed or not    
         nextNodeNameIdsT: NameT[],                    // multpe nodes may follow
@@ -315,14 +329,13 @@ export namespace OceanFlow {
 
     //// node-instance is an "abstract" type.
     //// extension like job/form have the implementation
-    export const NodeInstancePK = "nodeInstanceIdT";
-    export type NodeInstanceT = {
+    export const FlowInstancePK = "nodeInstanceIdT";
+    export type NodeInstanceT = EntityT & {
         timestampedT: TimestampT,
-        [NodeInstancePK]: IdT,
-        [NodeConfigPK]: NameT,
-        [FlowInstancePK]: NameT,
+        [NodeConfigSK]: NameT,
+        [FlowInstancePK]: InstanceIdT,
     };
-    export type AtLeastNodeInstance = AtLeast<NodeInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
+    export type AtLeastNodeInstance = AtLeast<NodeInstanceT, typeof NodeConfigSK | typeof FlowInstancePK>;
 
     //// the status of a job
     export enum TaskStatusE {
@@ -339,7 +352,7 @@ export namespace OceanFlow {
         attemptsT: TaskAttemptT[],           // users access form
         statusE: TaskStatusE,
     };
-    export type AtLeastTaskInstanceT = AtLeast<TaskInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
+    export type AtLeastTaskInstanceT = AtLeast<TaskInstanceT, typeof NodeConfigSK | typeof FlowInstancePK>;
 
 
 
@@ -370,15 +383,15 @@ export namespace OceanFlow {
         currentUserEmailT: EmailT,              // easy access to last user (db filtering)
         tempDataItemsT: DataValueT[],           // when user saves form for later
     };
-    export type AtLeastFormInstanceT = AtLeast<FormInstanceT, typeof NodeConfigPK | typeof FlowInstancePK>;
+    export type AtLeastFormInstanceT = AtLeast<FormInstanceT, typeof NodeConfigSK | typeof FlowInstancePK>;
 
 
     ////// the flow configuration
 
     //// configuration settings for a flow type
-    export const FlowConfigPK = "flowNameIdT";
-    export type FlowConfigT = {
-        [FlowConfigPK]: NameT,                  // flow name
+    export const FlowConfigSK = "flowNameIdT";
+    export type FlowConfigT = EntityT & {
+        [FlowConfigSK]: NameT,                  // flow name
         startFormNameT: NameT,                  // kick start data input as contained in form
         dataConfigsT: DataPropertiesT[],        // every data item has its own data/validation
         taskConfigsT: TaskConfigT[],            // all the form widgets in this flow
@@ -399,16 +412,14 @@ export namespace OceanFlow {
         description: DescriptionT,
         credential: CredentialT,                // who was active when log generated
         form?: {
-            instanceId: IdT,
+            instanceId: InstanceIdT,
             formData: DataValueT[],          // data received from a form
         },
     };
 
     //// flow-instance spawned by respective flow-config
-    export const FlowInstancePK = "flowInstanceIdT";
-    export type FlowInstanceT = {
-        [FlowInstancePK]: IdT,
-        [FlowConfigPK]: NameT,                        // form-config name that spawned this instance
+    export type FlowInstanceT = EntityT & {
+        [FlowConfigSK]: NameT,                        // form-config name that spawned this instance
         timestamps: {
             createdT: TimestampT,
             closedT?: TimestampT,
@@ -418,7 +429,7 @@ export namespace OceanFlow {
         dataItemsT: DataValueT[],
         statusE: FlowStatusE,
     };
-    export type AtLeastFlowInstanceT = AtLeast<FlowInstanceT, typeof FlowConfigPK>;
+    export type AtLeastFlowInstanceT = AtLeast<FlowInstanceT, typeof FlowConfigSK>;
 
 
     //// this part defines the execution pipeline for user service requests
@@ -438,7 +449,7 @@ export namespace OceanFlow {
     export type ContextT = {
         userEmailIdT?: EmailT,                    // optional calling user, maybe a public user
         // when taking an action on a form
-        formInstanceIdT?: IdT,          // needed for task specific actions
+        formInstanceIdT?: InstanceIdT,          // needed for task specific actions
         formDataValuesT?: DataValueT[],         // values submitted for the user action
         // when starting a work flow
         flowNameIdT?: NameT,                      // needed for flow start actions

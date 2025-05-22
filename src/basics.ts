@@ -1,7 +1,7 @@
 
 
 import { OceanFlow as t } from "./types";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as i } from "./design";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as db } from "./store";
 import { OceanFlow as c } from "./configs";
@@ -10,28 +10,34 @@ import { OceanFlow as c } from "./configs";
 export namespace OceanFlow {
 
     /**
-     * Base for all entities with a primary key.
-     * [IdT] is the type of the primary key field
+     * Base entity class.
+     * [IdT] is the type of the primary key property
+     * [DataT] is the json object
      */
-    export abstract class Entity implements d.Entity {
+    export abstract class Entity<IdT, DataT extends t.EntityT>
+        implements i.Entity<IdT, DataT> {
 
         // the property name of the primary key field in data
-        protected readonly idPropertyName: string;
+        protected readonly idKey: string;
 
         // the json data object
-        protected readonly dataT: t.BaseT;
+        protected readonly dataT: DataT;
 
         /**
-         * @param idPropertyName the property name of the primary key field in data
+         * @param idKey the property name of the primary key field in data
          * @param dataT the json data object
          */
-        constructor(idPropertyName: string, dataT: t.BaseT) {
-            this.idPropertyName = idPropertyName;
+        constructor(idKey: string, dataT: DataT) {
+            this.idKey = idKey;
             this.dataT = dataT;
         }
 
-        getIdT(): string {
-            return this.dataT[this.idPropertyName];
+        getIdT(): IdT {
+            return this.dataT[this.idKey as keyof DataT] as IdT;
+        }
+
+        getDataT(): DataT {
+            return this.dataT;
         }
 
     }
@@ -40,18 +46,20 @@ export namespace OceanFlow {
      * Savable base for all entities.
      * [IdT] is the type of the primary key field
      */
-    export abstract class SavableEntity extends Entity implements d.Savable {
+    export abstract class SavableEntity<IdT, DataT extends t.EntityT>
+        extends Entity<IdT, DataT>
+        implements i.Saveable {
 
         // data-store - this is temporary. TODO move to database. 
         private readonly fsdb: any;
 
         /**
-         * @param idPropertyName the property name of the primary key field in data
+         * @param idKey the property name of the primary key field in data
          * @param dataT the json data object
          * @param fsdb [temp] data store
          */
-        constructor(idPropertyName: string, dataT: t.BaseT, fsdb: any) {
-            super(idPropertyName, dataT);
+        constructor(idKey: string, dataT: DataT, fsdb: any) {
+            super(idKey, dataT);
             this.fsdb = fsdb;
         }
 
@@ -219,21 +227,15 @@ export namespace OceanFlow {
         return rstr.substring(0, 40);
     }
 
-    export function hasAccess(accessing: d.Securable, credential: d.Securable): t.AuditCauseT[] {
+    export function hasAccess(accessing: i.Securable<t.SecurableT>, credential: i.Securable<t.SecurableT>): t.AuditCauseT[] {
         const auditCauses: t.AuditCauseT[] = [];
         const commonRoles = accessing.hasRoleNamesT().filter(role1T => credential.hasRoleNamesT().includes(role1T));
         if (commonRoles.length == 0) {
             const auditCause: t.AuditCauseT = {
                 descriptionT: "authorization failed",
                 payloadT: {
-                    accessing: {
-                        loginEmailIdT: accessing.getIdT(),
-                        roleNamesT: accessing.hasRoleNamesT(),
-                    },
-                    credential: {
-                        loginEmailIdT: credential.getIdT(),
-                        roleNamesT: credential.hasRoleNamesT(),
-                    },
+                    accessing: accessing.getData(),
+                    credential: credential.getData(),
                 },
             };
             s.AuditReport.toReport(credential, auditCause).save();

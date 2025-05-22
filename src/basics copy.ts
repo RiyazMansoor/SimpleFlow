@@ -14,8 +14,8 @@ export namespace OceanFlow {
      * <IdT> is the type of the primary key field
      * <DataT> is the json data object
      */
-    export abstract class Entity<IdT, DataT extends { [key: string]: any }>
-        implements d.Entity<IdT, DataT> {
+    export abstract class Entity<IdT, DataT> {
+        // implements d.Entity<IdT, DataT> {
 
         // the property name of the primary key field in data
         protected readonly idPropertyName: string;
@@ -32,8 +32,11 @@ export namespace OceanFlow {
             this.dataT = dataT;
         }
 
-        getIdT(): IdT {
-            return this.dataT[this.idPropertyName];
+        getValueByKey<DataT, K extends keyof DataT>(obj: DataT, key: K): T[K] {
+            return obj[key];
+        }
+        getIdT(): string {
+            return this.dataT[this.idPropertyName as keyof DataT];
         }
 
         // getDataT(): DataT {
@@ -159,7 +162,7 @@ export namespace OceanFlow {
          * @returns the authorized role-names for this object
          */
         hasRoles(): t.NameT[] {
-            return this.dataT[t.RoleNamesProperty];
+            return this.dataT[t.PropRoleNames];
         }
 
         /**

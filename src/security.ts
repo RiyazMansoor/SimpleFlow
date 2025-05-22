@@ -1,7 +1,7 @@
 
 import { OceanFlow as t } from "./types";
 import { OceanFlow as b } from "./basics";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as i } from "./design";
 import { OceanFlow as db } from "./store";
 
 
@@ -11,21 +11,23 @@ export namespace OceanFlow {
     /**
      * Security roles for access to parts of the different work-flows.
      */
-    export class Role extends b.SavableEntity {
+    export class Role
+        extends b.SavableEntity<t.NameT, t.RoleT>
+        implements i.Enableable<t.RoleT> {
 
         static fsdb: any = db.dbRoles;
 
         /**
          * @see [types.AtLeastRole] minimum parameters needed
-         * @param roleT minimum role json to create this Role
+         * @param atLeastRoleT minimum role json to create this Role
          */
-        constructor(roleT: t.AtLeastRoleT) {
+        constructor(atLeastRoleT: t.AtLeastRoleT) {
             const dataT: t.RoleT = {
-                [t.RoleSK]: roleT[t.RoleSK],
-                descriptionT: roleT.descriptionT,
-                enabled: roleT.enabled ?? true,
+                [t.RolePK]: atLeastRoleT[t.RolePK],
+                descriptionT: atLeastRoleT.descriptionT,
+                enabled: atLeastRoleT.enabled ?? true,
             };
-            super(t.RoleSK, dataT, Role.fsdb);
+            super(t.RolePK, dataT, Role.fsdb);
         }
 
         /**
@@ -46,17 +48,10 @@ export namespace OceanFlow {
             return this;
         }
 
-        /**
-         * @returns true if this role is enabled
-         */
         isEnabled(): boolean {
             return this.dataT.enabled;
         }
 
-        /**
-         * @param status updated enabled status
-         * @returns this object for chaining
-         */
         enable(status: boolean): Role {
             this.dataT.enabled = status;
             // todo => iterate credentials to update disabled status
@@ -69,20 +64,21 @@ export namespace OceanFlow {
     /**
      * User passwords and login management
      */
-    export class Login extends b.SavableEntity<t.EmailT, t.LoginT> {
+    export class Login
+        extends b.SavableEntity<t.EmailT, t.LoginT> {
 
         static fsdb: any = db.dbLogins;
 
         /**
          * @see [types.AtLeastLoginT] minimum parameters needed
-         * @param loginT minimum Login json data to create this Login
+         * @param atLeastLoginT minimum Login json data to create this Login
          */
-        constructor(loginT: t.AtLeastLoginT) {
+        constructor(atLeastLoginT: t.AtLeastLoginT) {
             const dataT: t.LoginT = {
-                [t.LoginSK]: loginT[t.LoginSK],
-                passwordT: loginT.passwordT,
+                [t.LoginPK]: atLeastLoginT[t.LoginPK],
+                passwordT: atLeastLoginT.passwordT,
             };
-            super(t.LoginSK, dataT, Login.fsdb);
+            super(t.LoginPK, dataT, Login.fsdb);
         }
 
         /**
@@ -118,9 +114,9 @@ export namespace OceanFlow {
     /**
      * A users credential to accessing parts of this application
      */
-    export class Securable 
-        extends b.SavableEntity<t.EmailT, t.CredentialT> 
-        implements d.Securable<t.EmailT, t.CredentialT> {
+    export class Credential
+        extends b.SavableEntity<t.EmailT, t.CredentialT>
+        implements i.Saveable, i.Securable<t.CredentialT>, i.Enableable<t.CredentialT> {
 
         static fsdb: any = db.dbCredentials;
 
@@ -130,13 +126,13 @@ export namespace OceanFlow {
          */
         constructor(credentialT: t.AtLeastCredentialT) {
             const dataT: t.CredentialT = {
-                [t.LoginSK]: credentialT[t.LoginSK],
+                [t.LoginPK]: credentialT[t.LoginPK],
                 userNameT: credentialT.userNameT,
-                [t.RoleNamesProperty]: credentialT[t.RoleNamesProperty] ?? [],
+                [t.PropRoleNames]: credentialT[t.PropRoleNames] ?? [],
                 enabled: credentialT.enabled ?? true,
                 updatedT: credentialT.updatedT ?? [],
             };
-            super(t.LoginSK, dataT, Securable.fsdb);
+            super(t.LoginPK, dataT, Credential.fsdb);
         }
 
         /**
@@ -144,22 +140,18 @@ export namespace OceanFlow {
          * @loginEmailIdT the value of the primary key of the credential json data object
          * @returns the Credential object representing the json data object or undefined if not found
          */
-        static getInstance(loginEmailIdT: t.EmailT): Securable | undefined {
-            return super.loadInstance(Securable.fsdb, loginEmailIdT, Securable);
-        }
-
-        getDataT(): t.CredentialT {
-            return this.dataT;
+        static getInstance(loginEmailIdT: t.EmailT): Credential | undefined {
+            return super.loadInstance(Credential.fsdb, loginEmailIdT, Credential);
         }
 
         /**
          * @param roleNameIdT role to add to this credential
          * @returns returns this Credential for chaining
          */
-        addRole(roleNameIdT: t.NameT): Securable {
-            const index = this.dataT[t.RoleNamesProperty].indexOf(roleNameIdT);
+        addRole(roleNameIdT: t.NameT): Credential {
+            const index = this.dataT[t.PropRoleNames].indexOf(roleNameIdT);
             if (index < 0) {
-                this.dataT[t.RoleNamesProperty].push(roleNameIdT);
+                this.dataT[t.PropRoleNames].push(roleNameIdT);
                 this.update();
             };
             return this;
@@ -169,31 +161,24 @@ export namespace OceanFlow {
          * @param roleNameIdT role to remove to this credential
          * @returns returns this Credential for chaining
          */
-        removeRole(roleNameIdT: t.NameT): Securable {
-            const index = this.dataT[t.RoleNamesProperty].indexOf(roleNameIdT);
+        removeRole(roleNameIdT: t.NameT): Credential {
+            const index = this.dataT[t.PropRoleNames].indexOf(roleNameIdT);
             if (index >= 0) {
-                this.dataT[t.RoleNamesProperty].splice(index, 1);
+                this.dataT[t.PropRoleNames].splice(index, 1);
                 this.update();
             };
             return this;
         }
 
-        hasRoles(): t.NameT[] {
-            return this.dataT[t.RoleNamesProperty];
+        hasRoleNamesT(): t.NameT[] {
+            return this.dataT[t.PropRoleNames];
         }
 
-        /**
-         * @returns true if this credential is enabled
-         */
         isEnabled(): boolean {
             return this.dataT.enabled;
         }
 
-        /**
-         * @param status updated enabled status
-         * @returns this object for chaining
-         */
-        enable(status: boolean): Securable {
+        enable(status: boolean): Credential {
             this.dataT.enabled = status;
             this.update();
             return this;
@@ -209,8 +194,9 @@ export namespace OceanFlow {
     /**
      * Audit reports of happenings and serious issues that have to be followed up.
      */
-    export class AuditReport 
-        extends b.SavableEntity<t.IdT, t.AuditReportT> {
+    export class AuditReport
+        extends b.SavableEntity<t.InstanceIdT, t.AuditReportT>
+        implements i.Saveable, i.Closeable<t.AuditReportT> {
 
         static fsdb: any = db.dbAuditReports;
 
@@ -241,7 +227,7 @@ export namespace OceanFlow {
          * @auditReportInstanceIdT the value of the primary key of the audit report json data object
          * @returns the AuditReport object representing the json data object or undefined if not found
          */
-        static getInstance(auditReportInstanceIdT: t.IdT): AuditReport | undefined {
+        static getInstance(auditReportInstanceIdT: t.InstanceIdT): AuditReport | undefined {
             return super.loadInstance(AuditReport.fsdb, auditReportInstanceIdT, AuditReport);
         }
 
@@ -301,8 +287,8 @@ export namespace OceanFlow {
             return reviewT;
         }
 
-        static toReport(credential: d.Securable<t.EmailT, t.CredentialT>, ...auditCausesT: t.AuditCauseT[]): AuditReport {
-            return new AuditReport({ credentialT: credential.getDataT() }).addCauses(...auditCausesT);
+        static toReport(credentialT: t.CredentialT, ...auditCausesT: t.AuditCauseT[]): AuditReport {
+            return new AuditReport({ credentialT: credentialT }).addCauses(...auditCausesT);
         }
 
     }

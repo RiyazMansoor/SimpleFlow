@@ -5,7 +5,6 @@ import { OceanFlow as d } from "./design";
 import { OceanFlow as c } from "./configs";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as i } from "./instances";
-import { data } from "jquery";
 // import { OceanFlow as v } from "./validations";
 
 export namespace OceanFlow {
@@ -70,7 +69,7 @@ export namespace OceanFlow {
      * <ConfigT> must extend basic node json object [NodeConfigT]
      */
     export abstract class NodeConfig<ConfigT extends t.NodeConfigT>
-        extends b.Entity<t.NameT, ConfigT>
+        extends b.Entity<ConfigT>
         implements d.NodeConfig<ConfigT> {
 
         protected readonly flowConfig: FlowConfig;
@@ -80,7 +79,7 @@ export namespace OceanFlow {
          * @param flowConfig the work-flow configuration object 
          */
         constructor(configT: ConfigT, flowConfig: FlowConfig) {
-            super(t.NodeConfigPK, configT);
+            super(configT);
             this.flowConfig = flowConfig;
         }
 
@@ -93,10 +92,10 @@ export namespace OceanFlow {
         }
 
         hasRoles(): t.NameT[] {
-            return this.dataT[t.RoleNamesProperty];
+            return this.dataT[t.PropRoleNames];
         }
 
-        hasRolesAccess(credential: d.Securable<t.EmailT, t.CredentialT>): t.AuditCauseT[] {
+        hasRolesAccess(credential: d.Securable): t.AuditCauseT[] {
             return b.hasAccess(this, credential);
         }
 
@@ -116,7 +115,7 @@ export namespace OceanFlow {
                 switch (nodeConfig.type()) {
                     case t.NodeTypeE.FORM:
                         const formInstanceT: t.AtLeastFormInstanceT = {
-                            [t.NodeConfigPK]: nodeConfig.getIdT(),
+                            [t.NodeConfigSK]: nodeConfig.getIdT(),
                             [t.FlowInstancePK]: flowInstance.getIdT(),
                         };
                         const formInstance: i.FormInstance = new i.FormInstance(formInstanceT);
@@ -124,7 +123,7 @@ export namespace OceanFlow {
                         break;
                     case t.NodeTypeE.TASK:
                         const taskInstanceT: t.AtLeastTaskInstanceT = {
-                            [t.NodeConfigPK]: nodeConfig.getIdT(),
+                            [t.NodeConfigSK]: nodeConfig.getIdT(),
                             [t.FlowInstancePK]: flowInstance.getIdT(),
                         };
                         const taskInstance: i.TaskInstance = new i.TaskInstance(taskInstanceT);
@@ -283,7 +282,7 @@ export namespace OceanFlow {
 
 
         constructor(flowConfigT: t.FlowConfigT) {
-            super(t.FlowConfigPK, flowConfigT);
+            super(t.FlowConfigSK, flowConfigT);
             flowConfigT.dataConfigsT.forEach(dataConfigT => this.dataConfigsT.set(dataConfigT[t.DataPropertiesPK], dataConfigT));
             flowConfigT.formWidgetsT.forEach(htmlConfigT => this.htmlConfigsT.set(htmlConfigT[t.FormWidgetPK], htmlConfigT));
             this.nodeConfigs.setAll(...flowConfigT.formConfigsT.map(formConfigT => new FormConfig(formConfigT, this)));
@@ -292,7 +291,7 @@ export namespace OceanFlow {
 
         static createInstance(flowNameIdt: t.NameT): i.FlowInstance {
             const atLeastFlowInstanceT: t.AtLeastFlowInstanceT = {
-                [t.FlowConfigPK]: flowNameIdt,
+                [t.FlowConfigSK]: flowNameIdt,
             };
             return new i.FlowInstance(atLeastFlowInstanceT);
         }
@@ -350,7 +349,7 @@ export namespace OceanFlow {
             return {};
         }
 
-        formPicked(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+        formPicked(credential: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT {
             // fetch the form instance
             const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
             if (!formInstance) {
@@ -370,7 +369,7 @@ export namespace OceanFlow {
             return formInstance.formPicked(credential);
         }
 
-        formRequested(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+        formRequested(credential: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT {
             // fetch the form instance
             const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
             if (!formInstance) {
@@ -387,10 +386,10 @@ export namespace OceanFlow {
                 return b.wrapResponse(...auditCauses);
             };
             // access validated -> proceed to business logic
-            return formInstance .formRequested();
+            return formInstance.formRequested();
         }
 
-        formReturned(credential: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT {
+        formReturned(credential: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT {
             // fetch the form instance
             const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
             if (!formInstance) {
@@ -407,10 +406,10 @@ export namespace OceanFlow {
                 return b.wrapResponse(...auditCauses);
             };
             // access validated -> proceed to business logic
-            return formInstance .formReturned();
+            return formInstance.formReturned();
         }
 
-        formSaved(credential: s.Securable, nodeInstanceIdt: t.IdT, dataValuesT: t.DataValueT[]): t.ResponseT {
+        formSaved(credential: s.Securable, nodeInstanceIdt: t.InstanceIdT, dataValuesT: t.DataValueT[]): t.ResponseT {
             // fetch the form instance
             const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
             if (!formInstance) {
@@ -427,10 +426,10 @@ export namespace OceanFlow {
                 return b.wrapResponse(...auditCauses);
             };
             // access validated -> proceed to business logic
-            return formInstance .formSaved(dataValuesT);
+            return formInstance.formSaved(dataValuesT);
         }
 
-        formSubmitted(credential: s.Securable, nodeInstanceIdt: t.IdT, dataValuesT: t.DataValueT[]): t.ResponseT {
+        formSubmitted(credential: s.Securable, nodeInstanceIdt: t.InstanceIdT, dataValuesT: t.DataValueT[]): t.ResponseT {
             // fetch the form instance
             const formInstance: i.FormInstance = i.FormInstance.getInstance(nodeInstanceIdt) as i.FormInstance;
             if (!formInstance) {

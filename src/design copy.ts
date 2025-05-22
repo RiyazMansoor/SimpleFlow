@@ -8,7 +8,7 @@ import { OceanFlow as i } from "./instances";
 
 export namespace OceanFlow {
 
-    
+
     /**
      * An entity is represented by its primary key and the json object data record.
      * [IdT] the type of the primary key
@@ -71,7 +71,7 @@ export namespace OceanFlow {
 
     }
 
-    
+
     /**
      * The configuration of a node on a flow graph that has secured access.
      */
@@ -185,28 +185,28 @@ export namespace OceanFlow {
          * @param credential the user credential picking this form from general bucket
          * @returns the response
          */
-        formPicked(securable: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT;
+        formPicked(securable: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT;
 
         /**
          * User requests the form. 
          * @param credential the user credential picking this form from general bucket
          * @returns the response
          */
-        formRequested(securable: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT;
+        formRequested(securable: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT;
 
         /**
          * Users can return the form instance back to the general queue.
          * @param credential the user credential picking this form from general bucket
          * @returns the response
          */
-        formReturned(securable: s.Securable, nodeInstanceIdt: t.IdT): t.ResponseT;
+        formReturned(securable: s.Securable, nodeInstanceIdt: t.InstanceIdT): t.ResponseT;
 
         /**
          * Users can save the entered form data without submitting. Eg: waiting for more data.
          * @param credential the user credential picking this form from general bucket
          * @returns the response
          */
-        formSaved(securable: s.Securable, nodeInstanceIdt: t.IdT, dataInstancesT: t.DataValueT[]): t.ResponseT;
+        formSaved(securable: s.Securable, nodeInstanceIdt: t.InstanceIdT, dataInstancesT: t.DataValueT[]): t.ResponseT;
 
         /**
          * Users can submit the form data. Following logic is built in.
@@ -215,7 +215,7 @@ export namespace OceanFlow {
          * @param credential the user credential picking this form from general bucket
          * @returns the response
          */
-        formSubmitted(securable: s.Securable, nodeInstanceIdt: t.IdT, dataInstancesT: t.DataValueT[]): t.ResponseT;
+        formSubmitted(securable: s.Securable, nodeInstanceIdt: t.InstanceIdT, dataInstancesT: t.DataValueT[]): t.ResponseT;
     }
 
 
@@ -232,7 +232,7 @@ export namespace OceanFlow {
      * An abstract base node instance on the flow graph.
      * 
      */
-    export interface NodeInstance<DataT extends t.AtLeastNodeInstance> 
+    export interface NodeInstance<DataT extends t.AtLeastNodeInstance>
         extends SavableEntity<t.NameT, DataT> {
 
         /**
@@ -341,7 +341,7 @@ export namespace OceanFlow {
     /**
      * Savable flow instances for each user generated flow.
      */
-    export interface FlowInstance extends SavableEntity<t.IdT, t.FlowInstanceT> {
+    export interface FlowInstance extends SavableEntity<t.InstanceIdT, t.FlowInstanceT> {
 
         /**
          * No duplicate data instances are allowed - 
