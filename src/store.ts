@@ -17,7 +17,7 @@ export namespace OceanFlow {
     export const dbLogins = new FSDB("./db/Logins.json", false);
     export const dbCredentials = new FSDB("./db/Credentials.json", false);
     export const dbAuditReports = new FSDB("./db/AuditReports.json", false);
-    export const dbJobInstances = new FSDB("./db/JobInstances.json", false);
+    export const dbTaskInstances = new FSDB("./db/TaskInstances.json", false);
     export const dbFormInstances = new FSDB("./db/FormInstances.json", false);
     export const dbFlowInstances = new FSDB("./db/FlowInstances.json", false);
 

@@ -39,7 +39,7 @@ export namespace OceanFlow {
             return OceanFlowApp.app;
         }
 
-        add(...flowConfigsT: t.FlowConfigT[]): void {
+        add(...flowConfigsT: t.FlowDesignT[]): void {
             flowConfigsT
                 .map(configT => new c.FlowConfig(configT))
                 .forEach(config => this.flowConfigs.set(config.getIdT(), config));
@@ -94,27 +94,6 @@ export namespace OceanFlow {
             };
         }
 
-
-        private credential(loginEmailIdT: t.EmailT): s.Securable | undefined {
-            if (!loginEmailIdT) new s.Securable(t.PublicCredentialT);
-            return s.Securable.getInstance(loginEmailIdT);
-        }
-
-        private invalidCredential(loginEmailIdT: t.EmailT): t.ResponseT {
-            const auditCause: t.AuditCauseT = {
-                descriptionT: `valid login-email not found for [${loginEmailIdT}]`,
-                payloadT: {}
-            };
-            return b.wrapResponse(auditCause);
-        }
-
-        private invalidFlowName(flowNameIdT: t.NameT): t.ResponseT {
-            const auditCause: t.AuditCauseT = {
-                descriptionT: `valid flow-name not found for [${flowNameIdT}]`,
-                payloadT: {}
-            };
-            return b.wrapResponse(auditCause);
-        }
 
  
     }

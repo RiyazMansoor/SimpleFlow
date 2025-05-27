@@ -1,7 +1,7 @@
 
 import { OceanFlow as t } from "./types";
 import { OceanFlow as b } from "./basics";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as d } from "./interfaces";
 import { OceanFlow as c } from "./configs";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as i } from "./instances";
@@ -92,14 +92,14 @@ export namespace OceanFlow {
         }
 
         hasRoles(): t.NameT[] {
-            return this.dataT[t.PropRoleNames];
+            return this.dataT[t.PropSecured];
         }
 
         hasRolesAccess(credential: d.Securable): t.AuditCauseT[] {
             return b.hasAccess(this, credential);
         }
 
-        spawnNodes(flowInstance: i.FlowInstance): void {
+        createNodes(flowInstance: i.FlowInstance): void {
             this.nextNodes(flowInstance, this.dataT.nextNodeNameIdsT);
         }
 
@@ -115,7 +115,7 @@ export namespace OceanFlow {
                 switch (nodeConfig.type()) {
                     case t.NodeTypeE.FORM:
                         const formInstanceT: t.AtLeastFormInstanceT = {
-                            [t.NodeConfigSK]: nodeConfig.getIdT(),
+                            [t.NodeNamePK]: nodeConfig.getIdT(),
                             [t.FlowInstancePK]: flowInstance.getIdT(),
                         };
                         const formInstance: i.FormInstance = new i.FormInstance(formInstanceT);
@@ -123,14 +123,14 @@ export namespace OceanFlow {
                         break;
                     case t.NodeTypeE.TASK:
                         const taskInstanceT: t.AtLeastTaskInstanceT = {
-                            [t.NodeConfigSK]: nodeConfig.getIdT(),
+                            [t.NodeNamePK]: nodeConfig.getIdT(),
                             [t.FlowInstancePK]: flowInstance.getIdT(),
                         };
                         const taskInstance: i.TaskInstance = new i.TaskInstance(taskInstanceT);
                         taskInstance.save();
                         taskInstance.taskUpload();
                         if (taskInstance.isClosed()) {
-                            taskInstance.getConfig().spawnNodes(flowInstance);
+                            taskInstance.getConfig().createNodes(flowInstance);
                         };
                         break;
                     default:
@@ -238,7 +238,7 @@ export namespace OceanFlow {
         }
 
         filter(dataValuesT: t.DataValueT[]): t.DataValueT[] {
-            return dataValuesT.filter(dataValueT => this.flowDataNamesT.includes(dataValueT[t.DataPropertiesPK]));
+            return dataValuesT.filter(dataValueT => this.flowDataNamesT.includes(dataValueT[t.DataNamePK]));
         }
 
         validate(dataInstancesT: t.DataValueT[]): t.AuditCauseT[] {
@@ -271,19 +271,19 @@ export namespace OceanFlow {
      * The work-flow configuration tht contains all sub configurations.
      */
     export class FlowConfig
-        extends b.Entity<t.NameT, t.FlowConfigT>
+        extends b.Entity<t.NameT, t.FlowDesignT>
         implements d.FlowConfig {
 
 
-        private dataConfigsT = new Map<t.NameT, t.DataPropertiesT>();
+        private dataConfigsT = new Map<t.NameT, t.DataConfigT>();
         private htmlConfigsT = new Map<t.NameT, t.FormWidgetT>();
 
         private nodeConfigs = new b.EntityMap<t.NodeConfigT, NodeConfig<t.NodeConfigT>>();
 
 
-        constructor(flowConfigT: t.FlowConfigT) {
-            super(t.FlowConfigSK, flowConfigT);
-            flowConfigT.dataConfigsT.forEach(dataConfigT => this.dataConfigsT.set(dataConfigT[t.DataPropertiesPK], dataConfigT));
+        constructor(flowConfigT: t.FlowDesignT) {
+            super(t.FlowNamePK, flowConfigT);
+            flowConfigT.dataConfigsT.forEach(dataConfigT => this.dataConfigsT.set(dataConfigT[t.DataNamePK], dataConfigT));
             flowConfigT.formWidgetsT.forEach(htmlConfigT => this.htmlConfigsT.set(htmlConfigT[t.FormWidgetPK], htmlConfigT));
             this.nodeConfigs.setAll(...flowConfigT.formConfigsT.map(formConfigT => new FormConfig(formConfigT, this)));
             this.nodeConfigs.setAll(...flowConfigT.taskConfigsT.map(taskConfigT => new TaskConfig(taskConfigT, this)));
@@ -291,12 +291,12 @@ export namespace OceanFlow {
 
         static createInstance(flowNameIdt: t.NameT): i.FlowInstance {
             const atLeastFlowInstanceT: t.AtLeastFlowInstanceT = {
-                [t.FlowConfigSK]: flowNameIdt,
+                [t.FlowNamePK]: flowNameIdt,
             };
             return new i.FlowInstance(atLeastFlowInstanceT);
         }
 
-        dataConfigT(dataNameIdT: t.NameT): t.DataPropertiesT {
+        dataConfigT(dataNameIdT: t.NameT): t.DataConfigT {
             return this.dataConfigsT.get(dataNameIdT);
         }
 
@@ -344,7 +344,7 @@ export namespace OceanFlow {
             };
             flowInstance.save();
             // TODO: spawn next nodes
-            formConfig.spawnNodes(flowInstance);
+            formConfig.createNodes(flowInstance);
             // return empty response for success
             return {};
         }

@@ -1,7 +1,8 @@
 
 import { OceanFlow as t } from "./types";
 import { OceanFlow as b } from "./basics";
-import { OceanFlow as i } from "./design";
+import { OceanFlow as i } from "./interfaces";
+import { OceanFlow as f } from "./functions";
 import { OceanFlow as db } from "./store";
 
 
@@ -12,22 +13,18 @@ export namespace OceanFlow {
      * Security roles for access to parts of the different work-flows.
      */
     export class Role
-        extends b.SavableEntity<t.NameT, t.RoleT>
-        implements i.Enableable<t.RoleT> {
+        implements i.Saveable<t.RoleT>, i.Enableable<t.RoleT> {
 
-        static fsdb: any = db.dbRoles;
+
+        protected readonly dataT: t.RoleT;
 
         /**
          * @see [types.AtLeastRole] minimum parameters needed
          * @param atLeastRoleT minimum role json to create this Role
          */
         constructor(atLeastRoleT: t.AtLeastRoleT) {
-            const dataT: t.RoleT = {
-                [t.RolePK]: atLeastRoleT[t.RolePK],
-                descriptionT: atLeastRoleT.descriptionT,
-                enabled: atLeastRoleT.enabled ?? true,
-            };
-            super(t.RolePK, dataT, Role.fsdb);
+            const dataT: t.RoleT = t.defRoleT(atLeastRoleT);
+            this.dataT = dataT;
         }
 
         /**
@@ -36,7 +33,7 @@ export namespace OceanFlow {
          * @returns the Role object representing the json data object or undefined if not found
          */
         static getInstance(roleNameIdT: t.NameT): Role | undefined {
-            return super.loadInstance(Role.fsdb, roleNameIdT, Role);
+            return f.loadInstance(db.dbRoles, roleNameIdT, Role);
         }
 
         /**
@@ -48,12 +45,16 @@ export namespace OceanFlow {
             return this;
         }
 
+        save(descriptionT: t.DescriptionT, userT: t.UserT): void {
+            f.save(db.dbRoles, this.dataT, this.dataT[t.RoleNamePK], descriptionT, userT);
+        }
+
         isEnabled(): boolean {
-            return this.dataT.enabled;
+            return f.isEnabled(this.dataT);
         }
 
         enable(status: boolean): Role {
-            this.dataT.enabled = status;
+            f.enable(this.dataT, status);
             // todo => iterate credentials to update disabled status
             return this;
         }
@@ -65,20 +66,18 @@ export namespace OceanFlow {
      * User passwords and login management
      */
     export class Login
-        extends b.SavableEntity<t.EmailT, t.LoginT> {
+        implements i.Saveable<t.LoginT> {
 
-        static fsdb: any = db.dbLogins;
+
+        protected readonly dataT: t.LoginT;
 
         /**
          * @see [types.AtLeastLoginT] minimum parameters needed
          * @param atLeastLoginT minimum Login json data to create this Login
          */
-        constructor(atLeastLoginT: t.AtLeastLoginT) {
-            const dataT: t.LoginT = {
-                [t.LoginPK]: atLeastLoginT[t.LoginPK],
-                passwordT: atLeastLoginT.passwordT,
-            };
-            super(t.LoginPK, dataT, Login.fsdb);
+        constructor(atLeastLoginT: t.LeastLoginT) {
+            const dataT: t.LoginT = t.defLoginT(atLeastLoginT);
+            this.dataT = dataT;
         }
 
         /**
@@ -87,16 +86,26 @@ export namespace OceanFlow {
          * @returns the Login object representing the json data object or undefined if not found
          */
         static getInstance(loginEmailIdT: t.EmailT): Login | undefined {
-            return super.loadInstance(Login.fsdb, loginEmailIdT, Login);
+            return f.loadInstance(db.dbLogins, loginEmailIdT, Login);
+        }
+
+        save(descriptionT: t.DescriptionT, userT: t.UserT): void {
+            f.save(db.dbLogins, this.dataT, this.dataT[t.LoginEmailPK], descriptionT, userT);
         }
 
         /**
          * @param passwordT updated password to change
-         * @returns this Login object for chaining
+         * @returns array of failure causes or empty if successful
+         * @see [types.AuditCauseT] for structure
          */
-        setPassword(passwordT: t.PasswordT): Login {
-            this.dataT.passwordT = passwordT;
-            return this;
+        setPassword(passwordT: t.PasswordT): t.AuditCauseT[] {
+            const auditCausesT: t.AuditCauseT[] = [];
+            if (this.dataT.oldPasswordsT.includes(passwordT)) {
+                auditCausesT.push(f.toAuditCause("Password already used", {}));
+            } else {
+                this.dataT.passwordT = passwordT;
+            };
+            return auditCausesT;
         }
 
         /**
@@ -115,24 +124,18 @@ export namespace OceanFlow {
      * A users credential to accessing parts of this application
      */
     export class Credential
-        extends b.SavableEntity<t.EmailT, t.CredentialT>
-        implements i.Saveable, i.Securable<t.CredentialT>, i.Enableable<t.CredentialT> {
+        implements i.Saveable<t.CredentialT>, i.Enableable<t.CredentialT>, i.Authoriser<t.CredentialT> {
 
-        static fsdb: any = db.dbCredentials;
+
+        protected readonly dataT: t.CredentialT;
 
         /**
          * @see [types.AtLeastCredentialT] minimum parameters needed
          * @param crdentialT minimum credential json data to create this Credential
          */
-        constructor(credentialT: t.AtLeastCredentialT) {
-            const dataT: t.CredentialT = {
-                [t.LoginPK]: credentialT[t.LoginPK],
-                userNameT: credentialT.userNameT,
-                [t.PropRoleNames]: credentialT[t.PropRoleNames] ?? [],
-                enabled: credentialT.enabled ?? true,
-                updatedT: credentialT.updatedT ?? [],
-            };
-            super(t.LoginPK, dataT, Credential.fsdb);
+        constructor(atLeastCredentialT: t.LeastCredentialT) {
+            const dataT: t.CredentialT = t.defCredentialT(atLeastCredentialT);
+            this.dataT = dataT;
         }
 
         /**
@@ -141,7 +144,11 @@ export namespace OceanFlow {
          * @returns the Credential object representing the json data object or undefined if not found
          */
         static getInstance(loginEmailIdT: t.EmailT): Credential | undefined {
-            return super.loadInstance(Credential.fsdb, loginEmailIdT, Credential);
+            return f.loadInstance(db.dbCredentials, loginEmailIdT, Credential);
+        }
+
+        save(descriptionT: t.DescriptionT, userT: t.UserT): void {
+            f.save(db.dbCredentials, this.dataT, this.dataT[t.LoginEmailPK], descriptionT, userT);
         }
 
         /**
@@ -149,11 +156,7 @@ export namespace OceanFlow {
          * @returns returns this Credential for chaining
          */
         addRole(roleNameIdT: t.NameT): Credential {
-            const index = this.dataT[t.PropRoleNames].indexOf(roleNameIdT);
-            if (index < 0) {
-                this.dataT[t.PropRoleNames].push(roleNameIdT);
-                this.update();
-            };
+            f.addauthorisedRole(this.dataT, roleNameIdT);
             return this;
         }
 
@@ -162,31 +165,29 @@ export namespace OceanFlow {
          * @returns returns this Credential for chaining
          */
         removeRole(roleNameIdT: t.NameT): Credential {
-            const index = this.dataT[t.PropRoleNames].indexOf(roleNameIdT);
-            if (index >= 0) {
-                this.dataT[t.PropRoleNames].splice(index, 1);
-                this.update();
-            };
+            f.removeSecureRole(this.dataT, roleNameIdT);
             return this;
         }
 
-        hasRoleNamesT(): t.NameT[] {
-            return this.dataT[t.PropRoleNames];
+        availalbeRoleNamesT(): t.NameT[] {
+            return f.availableRoleNamesT(this.dataT);
+        }
+
+        isAuthorised(allowedRoleNamesIdT: t.NameT[]): t.AuditCauseT[] {
+            const auditCausesT: t.AuditCauseT[] = [];
+            if (!f.isAuthorised(this.dataT, allowedRoleNamesIdT)) {
+                auditCausesT.push(f.toAuditCause("Not Authorised", {}));
+            }
+            return auditCausesT;
         }
 
         isEnabled(): boolean {
-            return this.dataT.enabled;
+            return f.isEnabled(this.dataT);
         }
 
         enable(status: boolean): Credential {
-            this.dataT.enabled = status;
-            this.update();
+            f.enable(this.dataT, status);
             return this;
-        }
-
-        private update(): void {
-            this.dataT.updatedT.push(b.TimestampStr());
-            this.dataT.updatedT = this.dataT.updatedT.slice(-10);
         }
 
     }
@@ -195,31 +196,21 @@ export namespace OceanFlow {
      * Audit reports of happenings and serious issues that have to be followed up.
      */
     export class AuditReport
-        extends b.SavableEntity<t.InstanceIdT, t.AuditReportT>
-        implements i.Saveable, i.Closeable<t.AuditReportT> {
+        implements i.Saveable<t.AuditReportT>, i.Closeable<t.AuditReportT> {
 
-        static fsdb: any = db.dbAuditReports;
+        protected readonly dataT: t.AuditReportT;
 
         /**
          * @see [types.AtLeastAuditReportT] minimum parameters needed
-         * @param auditReportT minimum audit report json data to create an audit report
+         * @param atLeastAuditReportT minimum audit report json data to create an audit report
          */
-        constructor(auditReportT: t.AtLeastAuditReportT) {
-            const dataT: t.AuditReportT = {
-                timestampedT: auditReportT.timestampedT ?? b.TimestampStr(),
-                [t.AuditReportPK]: auditReportT[t.AuditReportPK] ?? b.RandomStr(),
-                auditTypeE: auditReportT.auditTypeE ?? t.AuditTypeE.INFO,
-                credentialT: auditReportT.credentialT,
-                stack: auditReportT.stack ?? "",
-                auditCausesT: auditReportT.auditCausesT ?? [],
-                auditReviewsT: auditReportT.auditReviewsT ?? [],
-                closed: auditReportT.closed ?? false,
-            };
+        constructor(atLeastAuditReportT: t.LeastAuditReportT) {
+            const dataT: t.AuditReportT = t.defAuditReportT(atLeastAuditReportT);
             if (!dataT.stack) {
                 Error.captureStackTrace(dataT, AuditReport);
-            }
-            super(t.AuditReportPK, dataT, AuditReport.fsdb);
-            this.freeze(this.isClosed());
+            };
+            this.dataT = dataT;
+            this.freeze();
         }
 
         /**
@@ -228,7 +219,11 @@ export namespace OceanFlow {
          * @returns the AuditReport object representing the json data object or undefined if not found
          */
         static getInstance(auditReportInstanceIdT: t.InstanceIdT): AuditReport | undefined {
-            return super.loadInstance(AuditReport.fsdb, auditReportInstanceIdT, AuditReport);
+            return f.loadInstance(db.dbAuditReports, auditReportInstanceIdT, AuditReport);
+        }
+
+        save(descriptionT: t.DescriptionT, userT: t.UserT): void {
+            f.save(db.dbCredentials, this.dataT, this.dataT[t.AuditReportPK], descriptionT, userT);
         }
 
         /**
@@ -238,7 +233,7 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         addCauses(...auditCausesT: t.AuditCauseT[]): AuditReport {
-            this.dataT.auditCausesT.push(...auditCausesT);
+            this.dataT.causesT.push(...auditCausesT);
             return this;
         }
 
@@ -249,7 +244,7 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         addReveiw(auditReveiwT: t.AuditReviewT): AuditReport {
-            this.dataT.auditReviewsT.push(auditReveiwT);
+            this.dataT.reviewsT.push(auditReveiwT);
             return this;
         }
 
@@ -257,7 +252,7 @@ export namespace OceanFlow {
          * @returns true if this AuditReport is closed
          */
         isClosed(): boolean {
-            return this.dataT.closed;
+            return f.isClosed(this.dataT);
         }
 
         /**
@@ -265,30 +260,18 @@ export namespace OceanFlow {
          * @returns this AuditReport for chaining
          */
         close(): AuditReport {
-            this.dataT.closed = true;
-            this.freeze(this.isClosed());
+            f.close(this.dataT);
+            this.freeze();
             return this;
         }
 
-        static toCause(descriptionT: t.DescriptionT, payloadT: t.JSONObjectT): t.AuditCauseT {
-            const causeT: t.AuditCauseT = {
-                descriptionT: descriptionT,
-                payloadT: payloadT,
-            };
-            return causeT;
+        freeze(): AuditReport {
+            f.freeze(this.dataT);
+            return this;
         }
 
-        static toReview(credentialT: t.CredentialT, descriptionT: t.DescriptionT): t.AuditReviewT {
-            const reviewT: t.AuditReviewT = {
-                timestampedT: b.TimestampStr(),
-                credentialT: credentialT,
-                descriptionT: descriptionT,
-            };
-            return reviewT;
-        }
-
-        static toReport(credentialT: t.CredentialT, ...auditCausesT: t.AuditCauseT[]): AuditReport {
-            return new AuditReport({ credentialT: credentialT }).addCauses(...auditCausesT);
+        static toReport(userT: t.UserT, ...auditCausesT: t.AuditCauseT[]): AuditReport {
+            return new AuditReport({ [t.PropUser]: userT }).addCauses(...auditCausesT);
         }
 
     }

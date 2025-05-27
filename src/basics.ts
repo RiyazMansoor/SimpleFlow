@@ -1,7 +1,6 @@
 
 
 import { OceanFlow as t } from "./types";
-import { OceanFlow as i } from "./design";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as db } from "./store";
 import { OceanFlow as c } from "./configs";
@@ -36,9 +35,9 @@ export namespace OceanFlow {
             return this.dataT[this.idKey as keyof DataT] as IdT;
         }
 
-        getDataT(): DataT {
-            return this.dataT;
-        }
+        // getDataT(): DataT {
+        //     return this.dataT;
+        // }
 
     }
 
@@ -46,9 +45,9 @@ export namespace OceanFlow {
      * Savable base for all entities.
      * [IdT] is the type of the primary key field
      */
-    export abstract class SavableEntity<IdT, DataT extends t.EntityT>
+    export abstract class EditableEntity<IdT, DataT extends t.EntityT>
         extends Entity<IdT, DataT>
-        implements i.Saveable {
+        implements i.Saveable<DataT> {
 
         // data-store - this is temporary. TODO move to database. 
         private readonly fsdb: any;
@@ -70,7 +69,7 @@ export namespace OceanFlow {
         }
 
         save(): void {
-            SavableEntity.saveData(this.fsdb, this.getIdT(), this.dataT);
+            EditableEntity.saveData(this.fsdb, this.getIdT(), this.dataT);
         }
 
         /**
@@ -92,20 +91,6 @@ export namespace OceanFlow {
         static loadData<IdT, DataT>(fsdb: any, id: IdT): DataT | undefined {
             const dataT: DataT | undefined = db.dbLoad(fsdb, id);
             return dataT;
-        }
-
-        /**
-         * Convenient generic static method to load class objects.
-         * @fsdb the database to query
-         * @idT the value of the primary key the json data object
-         * @returns the class object representing the json data object
-         */
-        static loadInstance<TId, DataT, Class>(fsdb: any, id: TId, clazz: t.Constructor<Class, DataT>): Class | undefined {
-            const dataT: DataT | undefined = SavableEntity.loadData(fsdb, id);
-            if (dataT) {
-                return new clazz(dataT);
-            }
-            return undefined;
         }
 
     }
@@ -208,24 +193,6 @@ export namespace OceanFlow {
 
     //// utility functions ////
 
-    /**
-     * @returns the ISO formatted current timestamp
-     */
-    export function TimestampStr(): t.TimestampT {
-        return new Date().toISOString();
-    }
-
-    /**
-     * @param len length of the random string - default 40
-     * @returns random string
-     */
-    export function RandomStr(len: t.IntegerT = 40): string {
-        let rstr = "";
-        while (rstr.length < len) {
-            rstr += Math.random().toString(36).substring(2, 12);
-        }
-        return rstr.substring(0, 40);
-    }
 
     export function hasAccess(accessing: i.Securable<t.SecurableT>, credential: i.Securable<t.SecurableT>): t.AuditCauseT[] {
         const auditCauses: t.AuditCauseT[] = [];

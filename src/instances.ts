@@ -2,7 +2,7 @@
 import { OceanFlow as t } from "./types";
 import { OceanFlow as b } from "./basics";
 import { OceanFlow as s } from "./security";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as d } from "./interfaces";
 import { OceanFlow as c } from "./configs";
 import { OceanFlow as m } from "./app";
 import { OceanFlow as db } from "./store";
@@ -31,7 +31,7 @@ export namespace OceanFlow {
      * A node instance may different implementations.
      */
     export abstract class NodeInstance<DataT extends t.AtLeastNodeInstance>
-        extends b.SavableEntity<t.NameT, DataT>
+        extends b.EditableEntity<t.NameT, DataT>
         implements d.NodeInstance<DataT> {
 
 
@@ -48,7 +48,7 @@ export namespace OceanFlow {
             super(t.NodeInstancePK, atLeastNodeInstanceT, fsdb);
             // these lines should never return null
             this.flowInstance = FlowInstance.getInstance(atLeastNodeInstanceT[t.FlowInstancePK])!;
-            this.nodeConfig = this.flowInstance.getConfig().nodeConfig(atLeastNodeInstanceT[t.NodeConfigSK]);
+            this.nodeConfig = this.flowInstance.getConfig().nodeConfig(atLeastNodeInstanceT[t.NodeNamePK]);
         }
 
         getConfig(): d.NodeConfig<t.NodeConfigT> {
@@ -76,7 +76,7 @@ export namespace OceanFlow {
             const dataT: t.TaskInstanceT = {
                 timestampedT: atLeastTaskInstanceT.timestampedT ?? b.TimestampStr(),
                 [t.NodeInstancePK]: atLeastTaskInstanceT[t.NodeInstancePK] ?? b.RandomStr(),
-                [t.NodeConfigSK]: atLeastTaskInstanceT[t.NodeConfigSK],
+                [t.NodeNamePK]: atLeastTaskInstanceT[t.NodeNamePK],
                 [t.FlowInstancePK]: atLeastTaskInstanceT[t.FlowInstancePK],
                 attemptsT: atLeastTaskInstanceT.attemptsT ?? [],
                 statusE: atLeastTaskInstanceT.statusE ?? t.TaskStatusE.OPEN,
@@ -122,16 +122,7 @@ export namespace OceanFlow {
          * @param formInstanceT the json object represeting this FormInstance 
          */
         constructor(formInstanceT: t.AtLeastFormInstanceT) {
-            const dataT: t.FormInstanceT = {
-                timestampedT: formInstanceT.timestampedT ?? b.TimestampStr(),
-                [t.NodeInstancePK]: formInstanceT[t.NodeInstancePK] ?? b.RandomStr(),
-                [t.NodeConfigSK]: formInstanceT[t.NodeConfigSK],
-                [t.FlowInstancePK]: formInstanceT[t.FlowInstancePK],
-                accessesT: formInstanceT.accessesT ?? [],
-                currentUserEmailT: formInstanceT.currentUserEmailT ?? "",
-                tempDataItemsT: formInstanceT.tempDataItemsT ?? [],
-                statusE: formInstanceT.statusE ?? t.FormStatusE.CREATED,
-            };
+            const dataT: t.FormInstanceT = t.defFormInstanceT(formInstanceT);
             super(dataT, FormInstance.fsdb);
             this.freeze(this.isClosed())
         }
@@ -211,7 +202,7 @@ export namespace OceanFlow {
             this.update().save();
             this.flowInstance.save();
             // data validated - ready to create a new workflow instance
-            this.getConfig().spawnNodes(this.flowInstance);
+            this.getConfig().createNodes(this.flowInstance);
             return {};
         }
 
@@ -231,7 +222,7 @@ export namespace OceanFlow {
 
         private update(): FormInstance {
             this.dataT.accessesT = this.dataT.accessesT.slice(-10);
-            this.dataT.currentUserEmailT = this.dataT.accessesT.slice(-1)[0].credentialT[t.LoginPK];
+            this.dataT.currentUserEmailT = this.dataT.accessesT.slice(-1)[0].credentialT[t.LoginEmailPK];
             return this;
         }
 
@@ -248,7 +239,7 @@ export namespace OceanFlow {
      * User generated flow instances as per its respective flow configuration.
      */
     export class FlowInstance
-        extends b.SavableEntity<t.InstanceIdT, t.FlowInstanceT>
+        extends b.EditableEntity<t.InstanceIdT, t.FlowInstanceT>
         implements d.FlowInstance {
 
         static fsdb = db.dbFlowInstances;
@@ -262,7 +253,7 @@ export namespace OceanFlow {
         constructor(flowInstanceT: t.AtLeastFlowInstanceT) {
             const dataT: t.FlowInstanceT = {
                 [t.FlowInstancePK]: flowInstanceT[t.FlowInstancePK] ?? b.RandomStr(),
-                [t.FlowConfigSK]: flowInstanceT[t.FlowConfigSK],
+                [t.FlowNamePK]: flowInstanceT[t.FlowNamePK],
                 logItemsT: flowInstanceT.logItemsT ?? [],
                 dataItemsT: flowInstanceT.dataItemsT ?? [],
                 statusE: flowInstanceT.statusE ?? t.FlowStatusE.OPEN,
@@ -272,7 +263,7 @@ export namespace OceanFlow {
             };
             super(t.FlowInstancePK, dataT, FlowInstance.fsdb);
             this.freeze(this.isClosed());
-            this.flowConfig = m.OceanFlowApp.getInstance().get(flowInstanceT[t.FlowConfigSK]);
+            this.flowConfig = m.OceanFlowApp.getInstance().get(flowInstanceT[t.FlowNamePK]);
         }
 
         /**
@@ -298,12 +289,12 @@ export namespace OceanFlow {
          */
         addData(dataItemsT: t.DataValueT[]): t.AuditCauseT[] {
             const auditCauses: t.AuditCauseT[] = [];
-            const existingDataItemNamesT = this.dataT.dataItemsT.map(dataItemT => dataItemT[t.DataPropertiesPK]);
+            const existingDataItemNamesT = this.dataT.dataItemsT.map(dataItemT => dataItemT[t.DataNamePK]);
             dataItemsT.forEach(dataItemT => {
-                const index = existingDataItemNamesT.indexOf(dataItemT[t.DataPropertiesPK]);
+                const index = existingDataItemNamesT.indexOf(dataItemT[t.DataNamePK]);
                 if (index >= 0) {
                     const auditCause: t.AuditCauseT = {
-                        descriptionT: `data overwrites not allowed - duplicate data-instance [${dataItemT[t.DataPropertiesPK]}]`,
+                        descriptionT: `data overwrites not allowed - duplicate data-instance [${dataItemT[t.DataNamePK]}]`,
                         payloadT: {
                             existing: this.dataT.dataItemsT[index],
                             adding: dataItemT,
@@ -346,8 +337,8 @@ export namespace OceanFlow {
          * @param descriptionT brief description of this log
          * @returns the log item created
          */
-        log(credential: s.Securable, descriptionT: t.DescriptionT): t.LogItemT {
-            const logItemT: t.LogItemT = {
+        log(credential: s.Securable, descriptionT: t.DescriptionT): t.LogT {
+            const logItemT: t.LogT = {
                 timestamp: b.TimestampStr(),
                 credential: credential.getDataT(),
                 description: descriptionT,

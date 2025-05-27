@@ -1,7 +1,7 @@
 
 
 import { OceanFlow as t } from "./types";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as d } from "./interfaces";
 import { OceanFlow as s } from "./security";
 import { OceanFlow as db } from "./store";
 import { OceanFlow as c } from "./configs";
@@ -162,7 +162,7 @@ export namespace OceanFlow {
          * @returns the authorized role-names for this object
          */
         hasRoles(): t.NameT[] {
-            return this.dataT[t.PropRoleNames];
+            return this.dataT[t.PropSecured];
         }
 
         /**

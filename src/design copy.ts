@@ -1,7 +1,7 @@
 
 import { OceanFlow as t } from "./types";
 import { OceanFlow as s } from "./security";
-import { OceanFlow as d } from "./design";
+import { OceanFlow as d } from "./interfaces";
 import { OceanFlow as c } from "./configs";
 import { OceanFlow as i } from "./instances";
 
@@ -146,14 +146,14 @@ export namespace OceanFlow {
     /**
      * 
      */
-    export interface FlowConfig extends Entity<t.NameT, t.FlowConfigT> {
+    export interface FlowConfig extends Entity<t.NameT, t.FlowDesignT> {
 
 
         /**
          * Form configurations pull the form specific data configurations to render.
          * @param dataNameIdT the data configurations to return
          */
-        dataConfigT(dataNameIdT: t.NameT): t.DataPropertiesT;
+        dataConfigT(dataNameIdT: t.NameT): t.DataConfigT;
 
         /**
          * Form configurations pull the form specific html configurations to render.

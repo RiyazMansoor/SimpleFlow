@@ -4,14 +4,14 @@ import { OceanFlow as t } from "./types";
 export namespace OceanFlow {
 
 
-    export function validateData(dataConfigT: t.DataPropertiesT, dataItemT: t.DataValueT): t.AuditCauseT[] {
+    export function validateData(dataConfigT: t.DataConfigT, dataItemT: t.DataValueT): t.AuditCauseT[] {
         const auditCauses: t.AuditCauseT[] = [];
         // if no validation
         const validations: t.ValidationT | undefined = dataConfigT.validations;
         if (!validations) return auditCauses;
         // the standard payload for validation issues
         const payload: t.JSONObjectT = {
-            [t.DataPropertiesPK]: dataConfigT[t.DataPropertiesPK],
+            [t.DataNamePK]: dataConfigT[t.DataNamePK],
             dataTypeE: dataConfigT.dataTypeE,
         };
         // data value must exist
