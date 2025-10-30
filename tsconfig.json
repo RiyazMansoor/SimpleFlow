@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+      "module": "System",
+      "noImplicitAny": true,
+      "removeComments": true,
+      "preserveConstEnums": true,
+      "outFile": "test/client/rmforms.js",
+      "sourceMap": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["**/*.spec.ts"]
+}

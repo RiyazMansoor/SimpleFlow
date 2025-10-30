@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<title>RM Test for W3.CSS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="http://www.w3schools.com/lib/w3.css">
+<link rel="stylesheet" href="http://www.w3schools.com/lib/w3-theme-deep-orange.css">
+<script>
+    var FRM = {
+        "title": "Sample form title",
+        "description": "this is a longer description ... maybe optional",
+        "sections": [
+            {
+                "title": "Section title 1",
+                "fields": [
+                    {
+                        "name": "fname",
+                        "label": "First Name",
+                        "width": "third",
+                        "required": true,
+                        "type": "text"
+                    },
+                    {
+                        "name": "mnames",
+                        "label": "Middle Names",
+                        "width": "third",
+                        "required": false,
+                        "type": "text"
+                    },
+                    {
+                        "name": "lname",
+                        "label": "Last Name",
+                        "width": "third",
+                        "required": true,
+                        "type": "text"
+                    }
+                ]
+            }
+        ]
+    }
+</script>
+
+<body>
+
+<form class="w3-container">
+
+<h2>Bordered Input</h2>
+<p>Add the w3-border class to create bordered inputs.</p>
+
+<p>
+<label>First Name</label>
+<input class="w3-input w3-border w3-round" name="first" type="text"></p>
+
+<p>
+<label>Last Name</label>
+<input class="w3-input w3-border" name="last" type="text"></p>
+
+</form>
+
+</body>
+</html> 
+

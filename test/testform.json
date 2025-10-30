@@ -1,0 +1,32 @@
+{
+    "title": "Sample form title",
+    "description": "this is a longer description ... maybe optional",
+    "sections": [
+        {
+            "title": "Section title 1",
+            "fields": [
+                {
+                    "name": "fname",
+                    "label": "First Name",
+                    "width": "third",
+                    "required": true,
+                    "type": "text"
+                },
+                {
+                    "name": "mnames",
+                    "label": "Middle Names",
+                    "width": "third",
+                    "required": false,
+                    "type": "text"
+                },
+                {
+                    "name": "lname",
+                    "label": "Last Name",
+                    "width": "third",
+                    "required": true,
+                    "type": "text"
+                }
+            ]
+        }
+    ]
+}
