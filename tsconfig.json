@@ -1,11 +1,13 @@
 {
     "compilerOptions": {
-      "module": "System",
-      "noImplicitAny": true,
-      "removeComments": true,
-      "preserveConstEnums": true,
-      "outFile": "test/client/rmforms.js",
-      "sourceMap": true
+        "module": "NodeNext",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "lib": [
+            "ESNext",
+        ],
     },
     "include": ["src/**/*"],
     "exclude": ["**/*.spec.ts"]

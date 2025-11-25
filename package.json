@@ -1,0 +1,8 @@
+{
+    "name": "simple-flow",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "firebase-functions": "^7.0.0"
+    }
+}
