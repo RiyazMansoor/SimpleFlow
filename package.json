@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "type": "module",
     "dependencies": {
+        "firebase": "^12.6.0",
         "firebase-functions": "^7.0.0"
     }
 }

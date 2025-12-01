@@ -1,8 +1,51 @@
 
-import { ConsoleLogger, Logger } from "./Logger.js";
-import { IntegerT, NameT, SpecIdT } from "./Types.js";
-import { CacheKeyFunc, Cache, CacheKey } from "./Utils.js";
-import { WorkflowSpecT } from "./Workflows.js";
+import { SpecCache } from "./Cache.js";
+import { SimpleflowError } from "./Errors.js";
+import { validateData } from "./Data.js";
+import { IntegerT, JSONObjectT, JSONValueT, NameT, SpecIdT } from "./Types.js";
+import { DataSpecT, validateActiveWorkflow, WorkflowInstanceT, WorkflowSpecT } from "./Workflows.js";
+import { WorkstepSpecT } from "./Worksteps.js";
+
+
+
+
+function isDataValid(dataNamesT: NameT, data: JSONObjectT, dataSpecsT?: DataSpecT[]): boolean {
+    for (const dataNameT of dataNamesT) {
+        // ignore if there is no data validation
+        const dataConditions: ConditionT[] = dataSpecsT.find((ds) => ds.dataNameT == dataNameT)?.dataConditions;
+        if (!dataConditions ||dataConditions.length == 0) continue;
+        // get data value
+        conditionResult(dataConditions, data);
+    };
+    return true;
+};
+
+const WorkflowsActiveCache: Map<string, WorkflowInstanceT> = new Map();
+
+
+export function createWorkflow(flowSpecIdT: SpecIdT, startData: JSONObjectT): SimpleflowError[] {
+    try {
+    // fetch flow specification
+    const wfSpec: WorkflowSpecT = WorkflowCache.get(flowSpecIdT);
+    // check spec is active
+    validateActiveWorkflow(wfSpec);
+    // check data is valid
+    validateData(wfSpec.dataSpecs, startData);
+    // validate start data
+    // execute: create flow and next steps, save as a batch.
+    // return empty array on success
+    // return errors if unsuccessful
+    } catch (error) {
+        return [error];
+    }
+    return [];
+};
+
+
+
+
+
+
 
 
 export interface WorkflowService {
@@ -24,10 +67,12 @@ export interface WorkflowService {
     
 };
 
-const WorkflowCacheKey: CacheKeyFunc<WorkflowSpecT> = (spec: WorkflowSpecT) => spec.flowSpecId;
-const WorkflowCache = new Cache<WorkflowSpecT>("Workflow Cache", WorkflowCacheKey);
 
 
+
+
+
+/*
 export class WorkflowServiceImpl implements WorkflowService {
 
     private logger: Logger = new ConsoleLogger("[Workflow Service]");
@@ -191,7 +236,7 @@ export class WorkflowServiceImpl implements WorkflowService {
             });
         }
     }
-*/
-};
 
+};
+*/
 

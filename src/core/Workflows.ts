@@ -1,65 +1,80 @@
 
-import * as logger from 'firebase-functions/logger';
 
 import { JSONObjectT, SpecIdT, HtmlT, NameT, InstanceIdT, AdminDataT, JSONPrimitiveT } from "./Types.js";
 import { randomStr, timestampStr } from "./Utils.js";
-import { WorkstepSpecT } from "./Worksteps.js";
-import { ConditionT } from './Conditions.js';
+import { DB_WORKSTEPS, WorkstepInstanceT, canPassGuardExpression, createWorkstep } from "./Worksteps.js";
+import { SimpleflowError } from './Errors.js';
+import { WorkstepCache } from './WorkflowService.js';
+
+import * as firestore from "firebase/firestore";
+import * as logger from "firebase-functions/logger"
+import { db } from "./Firebase.js";
+import { DataSpecT } from "./Data.js";
 
 
-export enum DataType {
-    STRING, INTEGER, FLOAT, DATESTR, BOOLEAN
+export const DB_WORKFLOWS = "Workflows";
+
+export type WorkflowSpecT = SpecIdT & {
+    dataSpecs: DataSpecT[],
+    nextSteps: SpecIdT[],
+    startData: NameT[],
+    isActive: boolean,
 };
 
-export type DataSpecT = {
-    dataNameT: NameT,
-    dataDescriptionT: HtmlT,
-    dataType: DataType,
-    dataDefault?: JSONPrimitiveT,
-    dataCondition?: ConditionT[],
-};
-
-export type WorkflowSpecT = {
-    flowSpecIdT: SpecIdT,
-    flowDescriptionT: HtmlT,
-    flowDataSpecT: DataSpecT[],
-    flowSteps: WorkstepSpecT[],
-    flowStartDataNamesT: NameT[],
-    flowIsActiveB: boolean,
-};
-
-export enum WorkflowStatusE {
+enum WorkflowStatusE {
     RUNNABLE, SUSPENDED, TERMINATED, COMPLETED_SUCCESS, COMPLETED_FAIL
 };
 
-export type WorkflowInstanceT = {
-    flowInstanceIdT: InstanceIdT,
-    flowSpecIdT: SpecIdT,
-    flowDataT: JSONObjectT,
-    flowStatusE: WorkflowStatusE
-    flowAdminDataT: AdminDataT,
+export type WorkflowInstanceT = SpecIdT & {
+    instanceId: InstanceIdT,
+    data: JSONObjectT,
+    status: WorkflowStatusE,
+    adminData: AdminDataT,
+    stepsData: {
+        [specName: NameT]: Pick<WorkstepInstanceT, "instanceId" | "status">[],
+    },
 };
 
 
-function checkWorkflowActive(workflowSpecT: WorkflowSpecT): boolean {
-    if (workflowSpecT.flowIsActiveB) {
-        throw new Error("Inactive workflow", workflowSpecT, startData);
-    
+export function validateActiveWorkflow(workflowSpecT: WorkflowSpecT): void {
+    if (!workflowSpecT.isActive) {
+        throw SimpleflowError.errorWorkflowNotActive(workflowSpecT);
     };
-
 };
 
-export function createWorkflow(workflowSpecT: WorkflowSpecT, startData: JSONObjectT): WorkflowInstanceT {
+// workflow is active
+// data has been validated
+export async function createWorkflow(workflowSpecT: WorkflowSpecT, startData: JSONObjectT): Promise<void> {
     const workflowInstanceT: WorkflowInstanceT = {
-        flowInstanceIdT: randomStr(40),
-        flowSpecIdT: workflowSpecT.flowSpecIdT,
-        flowDataT: startData,
-        flowStatusE: WorkflowStatusE.RUNNABLE,
-        flowAdminDataT: {
+        instanceId: randomStr(40),
+        specName: workflowSpecT.specName,
+        specVersion: workflowSpecT.specVersion,
+        data: startData,
+        status: WorkflowStatusE.RUNNABLE,
+        adminData: {
             startTimestampT: timestampStr(),
         },
+        stepsData: {},
     };
-    return workflowInstanceT;
+    const workstepInstancePromises: Promise<WorkstepInstanceT>[] = workflowSpecT.nextSteps
+        .map((specIdT) => WorkstepCache.get(specIdT))
+        .filter(workstepSpec => canPassGuardExpression(workstepSpec, startData))
+        .map(workstepSpec => createWorkstep(workstepSpec, workflowInstanceT, workflowSpecT.specName));
+    // TODO assert promises > 0
+    Promise.all(workstepInstancePromises).then(workstepInstances => {
+        const batch = firestore.writeBatch(db);
+        // new workflow
+        const flowRef = firestore.doc(db, DB_WORKFLOWS, workflowInstanceT.instanceId);
+        batch.set(flowRef, workflowInstanceT);
+        // add all the next steps
+        workstepInstances.forEach(workstepInstance => {
+            const stepRef = firestore.doc(db, DB_WORKSTEPS, workstepInstance.instanceId);
+            batch.set(stepRef, stepRef);
+        });
+        return batch.commit();
+    });
+    logger.error(workflowInstanceT); // TODO long error message
+    return Promise.reject(new Error(""));
 };
 
 /*

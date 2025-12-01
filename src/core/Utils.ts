@@ -1,25 +1,69 @@
 
-import { IntegerT, JSONPrimitiveT, JSONValueT, NameT, SpecIdT, TimestampStrT } from "./Types.ts";
-import { ConsoleLogger, Logger } from "./Logger.ts";
+/**
+ * Provides a collection of utility functions and constants
+ * that can be used throughout the application. 
+ * These utilities cover a range of functionalities, 
+ * from generating timestamps and random strings to validating an managing JSON data.
+ * @author Riyaz Mansoor <riyaz.mansoor@gmail.com>
+ * @version 1.0
+ */
 
-
-
+import { IntegerT, NameT, TimestampStrT, JSONObjectT, JSONValueT } from "./Types.js";
 
 /**
- * @returns the ISO formatted current timestamp
+ * Generates the current timestamp in ISO 8601 format.
+ * The ISO format is a standard for representing dates and times, ensuring
+ * consistency and compatibility across different systems.
+ *
+ * @returns {TimestampStrT} The current timestamp as an ISO formatted string.
+ * @example
+ * const now = timestampStr(); // "2024-07-30T12:34:56.789Z"
  */
 export function timestampStr(): TimestampStrT {
     return new Date().toISOString();
 };
 
 /**
- * Default length of the random string
+ * A regular expression for validating decimal numeric strings.
+ * This pattern allows for an optional leading sign (+ or -), followed by
+ * one or more digits, an optional decimal point, and then zero or more digits.
+ *
+ * It is used to ensure that a string represents a valid decimal number before
+ * attempting to parse it.
+ *
+ * @type {RegExp}
+ * @example
+ * PatternDecimal.test("123");       // true
+ * PatternDecimal.test("-45.67");    // true
+ * Patternical.test("+0.123");     // true
+ * PatternDecimal.test(".5");        // true
+ * PatternDecimal.test("abc");       // false
+ */
+export const PatternDecimal = /^[+-]?(\d+(\.\d*)?|\.\d+)$/
+
+/**
+ * The default length for randomly generated strings.
+ * This constant is used by the `randomStr` function when no specific length
+ * is provided, ensuring a consistent and secure default.
+ *
+ * @type {number}
  */
 export const DEFAULT_RANDOMSTR_LEN = 40;
 
 /**
- * @param len length of the random string - default 40
- * @returns random string
+ * Generates a random string of a specified length using a base-36 encoding.
+ * This is useful for creating unique identifiers, tokens, or any other value
+ * that needs to be random and unpredictable.
+ *
+ * The function repeatedly calls `Math.random()` and converts the result to a
+ * base-36 string, concatenating the parts until the desired length is reached.
+ *
+ * @param {IntegerT} [len=DEFAULT_RANDOMSTR_LEN] - The desired length of the random string.
+ *        If not provided, the default length of 40 will be used.
+ * @returns {string} A random base-36 string of the specified length.
+ * @example
+ * const token = randomStr(16);  // "a1b2c3d4e5f6g7h8"
+ * const id = randomStr();       // "z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4j3i2h1g0"
  */
 export function randomStr(len: IntegerT = DEFAULT_RANDOMSTR_LEN): string {
     let rstr = "";
@@ -30,64 +74,44 @@ export function randomStr(len: IntegerT = DEFAULT_RANDOMSTR_LEN): string {
 };
 
 
-export function CacheKey(val: JSONValueT): string {
-    if (typeof val == "object") {
-        return Object.values(val).join("|");
-    };
-    return val.toString();
-};
-
-
-export type CacheKeyFunc<T> = (t: T)=> JSONValueT;
-
-class Cache<T> {
-
-    private readonly cacheName: NameT;
-    private readonly cacheKeyFunc: CacheKeyFunc<T>;
-    private readonly cacheMap: Map<string, T> = new Map();
-
-    private readonly logger: Logger;;
-
-    constructor(cacheName: NameT, cacheKeyFunc: CacheKeyFunc<T>) {
-        this.cacheName = cacheName;
-        this.cacheKeyFunc = cacheKeyFunc;
-        // this.logger = new ConsoleLogger(cacheName);
-    };
-
-    name(): NameT {
-        return this.cacheName;
-    };
-
-    get(key: JSONValueT): T | undefined {
-        const keyStr = CacheKey(key);
-        const t: T = this.cacheMap.get(keyStr);
-        if (t) {
-            this.logger.info("get() found from cache", key);
+/**
+ * Retrieves a value from a nested JSON object using a dot-delimited key path.
+ * This function allows you to access deeply nested properties within a JSON
+ * structure without having to write long chains of property accessors.
+ *
+ * If the path is invalid or any intermediate key does not exist, the function
+ * will return `undefined`.
+ *
+ * @param {JSONObjectT} jsonObjectT - The JSON object from which to retrieve the value.
+ * @param {string} keyPath - A dot-delimited string representing the path to the
+ *        desired value (e.g., "user.address.city").
+ * @returns {JSONValueT | undefined} The value found at the specified path, or
+ *          `undefined` if the path is not valid.
+ * @see {@link JSONObjectT}
+ * @example
+ * const data = {
+ *   user: {
+ *     name: "John Doe",
+ *     address: {
+ *       city: "New York",
+ *       zip: "10001"
+ *     }
+ *   }
+ * };
+ *
+ * const city = jsonValue(data, "user.address.city");  // "New York"
+ * const country = jsonValue(data, "user.address.country"); // undefined
+ */
+export function jsonValue(jsonObjectT: JSONObjectT, keyPath: string): JSONValueT {
+    const keys = keyPath.split('.');
+    const lastkey = keys.pop();
+    let jsonCurrent = jsonObjectT;
+    for (const key of keys) {
+        if (jsonCurrent.hasOwnProperty(key) && typeof jsonCurrent[key] === 'object') {
+            jsonCurrent = jsonCurrent[key] as JSONObjectT;
         } else {
-            this.logger.error("get() not found in cache", key);
+            return undefined;
         };
-        return t;
     };
-
-    add(t: T): boolean {
-        const keystr = CacheKey(this.cacheKeyFunc(t));
-        if (this.cacheMap.get(keystr)) {
-            this.logger.log("add() duplicate spec-id fail", keystr);
-            return false;
-        };
-        this.cacheMap.set(keystr, t);
-        this.logger.log("add() added to cache", keystr);
-        return true;
-    };
-
-    remove(keystr: string): boolean {
-        const removed = this.cacheMap.delete(keystr);
-        if (removed) {
-            this.logger.log("remove() removed from cache", keystr);
-        } else {
-            this.logger.log("remove() not found in cache", keystr);
-        };
-        return removed;
-    };
-
+    return jsonCurrent[lastkey];
 };
