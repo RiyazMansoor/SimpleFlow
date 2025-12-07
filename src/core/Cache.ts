@@ -1,46 +1,41 @@
 /**
- * This file contains the implementation of a generic cache,
- * of versioned objects of type <code>SpecIdT</code>.
- * @see SpecIdT 
+ * This file contains the implementation of a generic cache.
+ *
  * @author Riyaz Mansoor <riyaz.mansoor@gmail.com>
  * @version 1.0
  */
 
-// Import necessary types from other modules.
-import { SimpleflowError } from "./Errors.js";
-import { SpecIdT, NameT } from "./Types.js";
-import { WorkflowSpecT } from "./Workflows.js";
-import { WorkstepSpecT } from "./Worksteps.js";
-
-// Import the logger from firebase-functions.
-import * as logger from 'firebase-functions/logger';
+import { error } from 'firebase-functions/logger';
+import * as t from "./Types.js";
+import * as e from "./Errors.js";
+import { DB } from "./Firebase.js";
+import { doc, DocumentReference, getDoc, WriteBatch } from "firebase/firestore";
 
 /**
  * A generic cache for storing and managing versioned objects.
  * Objects are identified by a SpecIdT type, which includes a name and a version.
  */
-class SpecCache<T extends SpecIdT> {
+class SpecCache<T extends t.SpecIdT> {
 
     // The name of the cache instance.
-    private name: NameT;
+    private cacheName: t.NameT;
     // The internal cache, a map where keys are spec names and values are arrays of specs.
-    private cache: Map<NameT, T[]> = new Map();
+    private cache: Map<t.NameT, T[]> = new Map();
 
     /**
      * Constructs a new SpecCache.
-     * @param name The name of the cache.
+     * @param cacheName The name of the cache.
      */
-    constructor(name: NameT) {
-        this.name = name;
-        this.cache = new Map<string, T[]>();
+    constructor(cacheName: t.NameT) {
+        this.cacheName = cacheName;
     };
 
     /**
      * Returns the name of the cache.
      * @returns The name of the cache.
      */
-    getName(): NameT {
-        return this.name;
+    getName(): t.NameT {
+        return this.cacheName;
     }
 
     /**
@@ -50,7 +45,7 @@ class SpecCache<T extends SpecIdT> {
      * @param specIdT The SpecIdT object containing the name and version.
      * @returns The requested spec object or undefined if not found.
      */
-    getSpec(specIdT: SpecIdT): T | undefined {
+    getSpec(specIdT: t.SpecIdT): T | undefined {
         const versions = this.cache.get(specIdT.specName);
         if (!versions) {
             // If no versions are found for the given spec name, return undefined.
@@ -73,39 +68,69 @@ class SpecCache<T extends SpecIdT> {
     addSpec(t: T): void {
         const versions = this.cache.get(t.specName);
         const index = versions ? versions.findIndex(v => v.specVersion === t.specVersion) : -1;
-        if (index === -1) {
-            // If the spec already exists, throw an error to prevent duplicates.
-            const errMessage = `${this.name} :: Duplicate spec-id ${JSON.stringify(t)}`;
-            logger.error(errMessage);
-            throw SimpleflowError.errorSpecDuplicate(errMessage, t);
+        if (index == -1) {
+            // Spec does not exist, add it to the cache.
+            versions.push(t);
+            versions.sort((a, b) => b.specVersion - a.specVersion);
+        } else {
+            // If the spec already exists, log an error as a warning.
+            versions[index] = t;
+            const errMessage = `${this.cacheName} :: Duplicate spec-id ${t.specName}/${t.specVersion}`;
+            error(errMessage, t);
         };
-        // Spec does not exist, add it to the cache.
-        versions.push(t);
-        versions.sort((a, b) => b.specVersion - a.specVersion);
-    };
-
-    /**
-     * Updates an existing spec in the cache.
-     * If the spec to be updated is not found, an error is thrown.
-     * @param t The spec object to update. The version of this object is used to find the existing object.
-     */
-    updateSpec(t: T): void {
-        const versions = this.cache.get(t.specName);
-        const index = versions ? versions.findIndex(v => v.specVersion === t.specVersion) : -1;
-        if (index === -1) {
-            // If the spec does not exists, throw an error to warn.
-            const errMessage = `${this.name} :: Expected but NOT found - spec-id ${JSON.stringify(t)}`;
-            logger.error(errMessage);
-            throw SimpleflowError.errorSpecNotFound(errMessage, t);
-        };
-        // Spec exists, update the cache.
-        versions[index] = t;
     };
 
 };
 
 // Create a singleton instance of SpecCache for workflows.
-export const WorkflowCache = new SpecCache<WorkflowSpecT>("Workflow Cache");
+export const WfSpecCache = new SpecCache<t.WfSpecT>("Workflow Spec Cache");
 
 // Create a singleton instance of SpecCache for worksteps.
-export const WorkstepCache = new SpecCache<WorkstepSpecT>("Workstep Cache");
+export const WsSpecCache = new SpecCache<t.SpecDefT>("Workstep Spec Cache");
+
+
+class InstanceCache<T extends t.InstanceDefT> {
+
+    private readonly collection: t.NameT;
+    // The internal cache, a map where keys are spec names and values are arrays of specs.
+    private readonly cache: Map<t.NameT, T> = new Map();
+
+
+    constructor(collection: t.NameT) {
+        this.collection = collection;
+    };
+
+    add(t: T): void {
+        this.cache.set(t.instanceKey, t);
+    };
+
+    async get(instanceKey: t.InstanceKeyT): Promise<T> {
+        if (!this.cache.has(instanceKey)) {
+            // load from db, add to cache, then return it.
+            const t: T = await getDoc(this.dbDocRef(instanceKey)).then(snapshot => snapshot.data() as T);
+            this.cache.set(instanceKey, t);
+            return t;
+        };
+        return this.cache.get(instanceKey);
+    };
+
+    remove(instanceKey: t.InstanceKeyT): void {
+        this.cache.delete(instanceKey);
+    };
+
+    dbDocRef(instanceId: t.InstanceKeyT): DocumentReference {
+        return doc(DB, this.collection, instanceId);
+    };
+
+    dbBatchWrite(writeBatch: WriteBatch, t: T): void {
+        writeBatch.set(this.dbDocRef(t.instanceKey), t);
+    };
+
+};
+
+const DB_COL_WORKFLOWS = "Workflows";
+export const WfInstanceCache = new InstanceCache<t.WfInstanceT>(DB_COL_WORKFLOWS);
+
+const DB_COL_WORKSTEPS = "Worksteps";
+export const WsInstanceCache = new InstanceCache<t.InstanceDefT>(DB_COL_WORKSTEPS);
+

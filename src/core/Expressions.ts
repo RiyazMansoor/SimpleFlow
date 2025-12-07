@@ -5,7 +5,7 @@
  */
 
 import { NameT, ExpressionT, JSONObjectT } from "./Types.js";
-import { PatternDecimal, jsonValue } from "./Utils.js";
+import { PatternDecimal, getJsonValue } from "./Utils.js";
 import { SimpleflowError } from "./Errors.js";
 
 /**
@@ -20,16 +20,13 @@ export enum ExpressionFuncsE {
     AND, OR                                         // logical
 };
 
-/**
- * Calculates the result of an expression.
- * @param expression The expression to calculate.
- * @param data The data to use for the calculation.
- * @param name The name of the datafield.
- * @returns True if the expression is true, false otherwise.
- */
-export function calculateExpression(expression: ExpressionT, data: JSONObjectT, name: NameT): boolean {
+export function exprResult(expression: ExpressionT, data: JSONObjectT): string {
     const tokens = tokensCreate(expression);
-    return tokensParse(tokens, data, name) === "true";
+    return tokensParse(tokens, data);
+};
+
+export function exprIsTrue(expression: ExpressionT, data: JSONObjectT): boolean {
+    return exprResult(expression, data) === "true";
 };
 
 /**
@@ -71,11 +68,10 @@ function tokensCreate(expression: ExpressionT): string[] {
  * Parses a token array and calculates the result.
  * @param tokens The token array to parse.
  * @param data The data to use for the calculation.
- * @param name The name of the datafield.
  * @returns The result of the calculation.
  * @private
  */
-function tokensParse(tokens: string[], data: JSONObjectT, name: NameT): string {
+function tokensParse(tokens: string[], data: JSONObjectT): string {
     if (tokens.length < 3) {
         throw new Error(`Expected minimum tokens: 3 but got: ${tokens.length}`);
     };
@@ -90,7 +86,7 @@ function tokensParse(tokens: string[], data: JSONObjectT, name: NameT): string {
         if (arg === ")") {
             // new function. recurse calculate
             tokens.push(arg);
-            args.push(tokensParse(tokens, data, name));
+            args.push(tokensParse(tokens, data));
         } else if (arg === "(") {
             fnName = tokens.pop() as string;
             break; // 
@@ -98,7 +94,7 @@ function tokensParse(tokens: string[], data: JSONObjectT, name: NameT): string {
             args.push(arg);
         }
     } while (true);
-    return calculate(fnName, args, data, name);
+    return calculate(fnName, args, data);
 
 };
 
@@ -107,21 +103,22 @@ function tokensParse(tokens: string[], data: JSONObjectT, name: NameT): string {
  * @param fnName The name of the function to calculate.
  * @param args The arguments of the function.
  * @param data The data to use for the calculation.
- * @param name The name of the datafield.
  * @returns The result of the calculation.
  * @private
  */
-function calculate(fnName: string, args: string[], data: JSONObjectT, name: NameT): string {
+function calculate(fnName: string, args: string[], data: JSONObjectT): string {
+
     /**
      * Checks if there is exactly one argument.
      * @throws {SimpleflowError} If there is not exactly one argument.
      */
     function string1(): void {
         if (args.length !== 1) {
-            const errMsg = `Function [${fnName}] at Datafield [${name}] expects 1 argument :: [${args.toString()}]`;
-            throw SimpleflowError.errorDataValidation(name, errMsg, data);
+            const errMsg = `Function [${fnName}] expects 1 argument :: [${args.toString()}]`;
+            throw SimpleflowError.dataCalulation(errMsg, data);
         };
     };
+    
     /**
      * Checks if there is exactly one numeric argument.
      * @throws {SimpleflowError} If there is not exactly one numeric argument.
@@ -129,20 +126,22 @@ function calculate(fnName: string, args: string[], data: JSONObjectT, name: Name
     function numeric1(): void {
         string1();
         if (args.every(arg => PatternDecimal.test(arg))) {
-            const errMsg = `Function [${fnName}] at Datafield [${name}] expects a numeric argument :: [${args.toString()}]`;
-            throw SimpleflowError.errorDataValidation(name, errMsg, data);
+            const errMsg = `Function [${fnName}] expects a numeric argument :: [${args.toString()}]`;
+            throw SimpleflowError.dataCalulation(errMsg, data);
         };
     };
+    
     /**
      * Checks if there are at least two arguments.
      * @throws {SimpleflowError} If there are less than two arguments.
      */
     function string2more(): void {
         if (args.length < 2) {
-            const errMsg = `Function [${fnName}] at Datafield [${name}] expects atleast 2 arguments :: [${args.toString()}]`;
-            throw SimpleflowError.errorDataValidation(name, errMsg, data);
+            const errMsg = `Function [${fnName}] expects atleast 2 arguments :: [${args.toString()}]`;
+            throw SimpleflowError.dataCalulation(errMsg, data);
         };
     };
+    
     /**
      * Checks if there are at least two numeric arguments.
      * @throws {SimpleflowError} If there are less than two numeric arguments.
@@ -150,18 +149,19 @@ function calculate(fnName: string, args: string[], data: JSONObjectT, name: Name
     function numeric2more(): void {
         string2more();
         if (args.every(arg => PatternDecimal.test(arg))) {
-            const errMsg = `Function [${fnName}] at Datafield [${name}] expects a numeric arguments :: [${args.toString()}]`;
-            throw SimpleflowError.errorDataValidation(name, errMsg, data);
+            const errMsg = `Function [${fnName}] expects a numeric arguments :: [${args.toString()}]`;
+            throw SimpleflowError.dataCalulation(errMsg, data);
         };
     };
+    
     switch (fnName.toUpperCase()) {
         case "FORMVALUE":
-            return jsonValue(data, args[0]).toString();
+            return getJsonValue(data, args[0]).toString();
         case "NOW":
             return new Date().toISOString();
         case "LEN":
             if (args.length !== 1) {
-                throw SimpleflowError.errorDataValidation(name, "LEN functeion expects 1 argument", data);
+                throw SimpleflowError.dataCalulation("LEN functeion expects 1 argument", data);
             };
             return args[0].length.toString();
         case "ADD":
@@ -222,4 +222,5 @@ function calculate(fnName: string, args: string[], data: JSONObjectT, name: Name
         default:
             return "NOT IMPLEMENTED";
     };
+    
 };

@@ -2,13 +2,12 @@
 /**
  * Provides a collection of utility functions and constants
  * that can be used throughout the application. 
- * These utilities cover a range of functionalities, 
- * from generating timestamps and random strings to validating an managing JSON data.
+ * 
  * @author Riyaz Mansoor <riyaz.mansoor@gmail.com>
  * @version 1.0
  */
 
-import { IntegerT, NameT, TimestampStrT, JSONObjectT, JSONValueT } from "./Types.js";
+import { IntegerT, TimestampStrT, JSONObjectT, JSONValueT } from "./Types.js";
 
 /**
  * Generates the current timestamp in ISO 8601 format.
@@ -35,7 +34,7 @@ export function timestampStr(): TimestampStrT {
  * @example
  * PatternDecimal.test("123");       // true
  * PatternDecimal.test("-45.67");    // true
- * Patternical.test("+0.123");     // true
+ * Patternical.test("+0.123");       // true
  * PatternDecimal.test(".5");        // true
  * PatternDecimal.test("abc");       // false
  */
@@ -52,14 +51,11 @@ export const DEFAULT_RANDOMSTR_LEN = 40;
 
 /**
  * Generates a random string of a specified length using a base-36 encoding.
- * This is useful for creating unique identifiers, tokens, or any other value
- * that needs to be random and unpredictable.
  *
  * The function repeatedly calls `Math.random()` and converts the result to a
  * base-36 string, concatenating the parts until the desired length is reached.
  *
  * @param {IntegerT} [len=DEFAULT_RANDOMSTR_LEN] - The desired length of the random string.
- *        If not provided, the default length of 40 will be used.
  * @returns {string} A random base-36 string of the specified length.
  * @example
  * const token = randomStr(16);  // "a1b2c3d4e5f6g7h8"
@@ -102,7 +98,7 @@ export function randomStr(len: IntegerT = DEFAULT_RANDOMSTR_LEN): string {
  * const city = jsonValue(data, "user.address.city");  // "New York"
  * const country = jsonValue(data, "user.address.country"); // undefined
  */
-export function jsonValue(jsonObjectT: JSONObjectT, keyPath: string): JSONValueT {
+export function getJsonValue(jsonObjectT: JSONObjectT, keyPath: string): JSONValueT {
     const keys = keyPath.split('.');
     const lastkey = keys.pop();
     let jsonCurrent = jsonObjectT;
@@ -115,3 +111,26 @@ export function jsonValue(jsonObjectT: JSONObjectT, keyPath: string): JSONValueT
     };
     return jsonCurrent[lastkey];
 };
+
+export function setJsonValue(jsonObjectT: JSONObjectT, keyPath: string, value: JSONValueT): void {
+    const keys = keyPath.split('.');
+    const lastkey = keys.pop();
+    let jsonCurrent = jsonObjectT;
+    for (const key of keys) {
+        // case of having property but not as an object - is NOT handled here
+        // since this is internal, tests should handle this before production
+        if (!(jsonCurrent.hasOwnProperty(key) && typeof jsonCurrent[key] === 'object')) {
+           jsonCurrent[key] = {};
+        };
+        jsonCurrent = jsonCurrent[key] as JSONObjectT;
+    };
+    jsonCurrent[lastkey] = value;
+};
+
+export function mergeJsonObjects(target: JSONObjectT, source: JSONObjectT, paths: string[]): JSONObjectT {
+    for (const path of paths) {
+        setJsonValue(target, path, getJsonValue(source, path));
+    };
+    return target;
+};
+
